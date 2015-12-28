@@ -1,13 +1,26 @@
 "use strict"
 
+const fs = require("fs")
 const path = require("path")
-const packageJson = JSON.parse(require("fs").readFileSync(path.join(process.cwd(), "package.json")))
+const packageJson = readPackageJson(path.join(process.cwd(), "package.json"))
 
 const DEFAULT_APP_DIR_NAME = "app"
 
 function reportResult(result) {
   if (result.status != 0) {
     console.log(result)
+  }
+}
+
+function readPackageJson(path) {
+  try {
+    return JSON.parse(fs.readFileSync(path))
+  }
+  catch (e) {
+    if (e instanceof SyntaxError) {
+      console.error(path + " is not a valid JSON file")
+    }
+    throw e
   }
 }
 
@@ -42,5 +55,14 @@ exports.installDependencies = function (arch, appDir) {
 }
 
 exports.reportResult = reportResult
+exports.readPackageJson = readPackageJson
 exports.packageJson = packageJson
-exports.DEFAULT_APP_DIR_NAME = DEFAULT_APP_DIR_NAME
+
+exports.commonArgs = [
+  {
+    name: "appDir",
+    type: String,
+    defaultValue: DEFAULT_APP_DIR_NAME,
+    description: "Relative (to the working directory) path to the folder containing the application package.json"
+  }
+]

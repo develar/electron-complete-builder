@@ -12,7 +12,17 @@ Part of your development package.json:
 ```json
 {
   "scripts" : {
-    "postinstall": "install-production-deps"
+    "postinstall": "install-app-deps"
   }
 }
 ```
+
+In your application package.json custom "build" field should be specified:
+```json
+"build": {
+  "app-bundle-id": "org.develar.onshape",
+  "app-category-type": "public.app-category.graphics-design",
+}
+```
+
+This object will be used as source of (electron-packager)[https://www.npmjs.com/package/electron-packager] options. You can specify any other options here.
