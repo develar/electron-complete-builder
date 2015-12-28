@@ -1,0 +1,12 @@
+{
+  "name": "electron-complete-builder",
+  "version": "0.1.0",
+  "license": "MIT",
+  "bin": {
+    "install-production-deps": "./cli/install-production-deps.js"
+  },
+  "dependencies": {
+    "command-line-args": "^2.1.3",
+    "electron-builder": "^2.5.0"
+  }
+}
