@@ -14,7 +14,8 @@ const args = require("command-line-args")(util.commonArgs.concat(
   {name: "platform", type: String, defaultValue: process.platform}
 )).parse()
 
-const appPackageJsonFile = path.normalize(path.join(process.cwd(), args.appDir, "package.json"))
+const appDir = path.normalize(path.join(process.cwd(), args.appDir))
+const appPackageJsonFile = path.normalize(path.join(appDir, "package.json"))
 const appPackageJson = util.readPackageJson(appPackageJsonFile)
 checkMetadata()
 
@@ -70,7 +71,7 @@ function pack() {
   util.installDependencies(currentArch)
 
   packager(Object.assign(appPackageJson.build || {}, {
-    dir: "app",
+    dir: appDir,
     out: args.platform === "win32" ? path.join(distDir, "win") : distDir,
     name: appPackageJson.name,
     platform: args.platform,
