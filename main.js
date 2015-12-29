@@ -8,7 +8,8 @@ const DEFAULT_APP_DIR_NAME = "app"
 
 function reportResult(result) {
   if (result.status != 0) {
-    console.log(result)
+    console.error(result)
+    throw result.error
   }
 }
 
