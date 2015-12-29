@@ -48,7 +48,17 @@ exports.installDependencies = function (arch, appDir) {
 
   const processWorkingDirectory = path.join(process.cwd(), appDir)
   console.log("Installing production dependencies to " + processWorkingDirectory)
-  reportResult(require("child_process").spawnSync(process.env.npm_execpath || (process.platform === "win32" ? "C:\\Program Files\\nodejs\\npm.cmd" : "npm"), ["install"], {
+
+  let npmExecPath = process.env.npm_execpath || process.env.NPM_CLI_JS
+  let npmExecArgs = ["install"]
+  if (npmExecPath == null) {
+    npmExecPath = "npm"
+  }
+  else {
+    npmExecArgs.unshift(npmExecPath)
+    npmExecPath = (process.env.npm_node_execpath || process.env.NODE_EXE || process.env.NODE_EXE || "node")
+  }
+  reportResult(require("child_process").spawnSync(npmExecPath, npmExecArgs, {
     cwd: processWorkingDirectory,
     stdio: "inherit",
     env: env
