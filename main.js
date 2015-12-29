@@ -30,6 +30,9 @@ exports.installDependencies = function (arch, appDir) {
     appDir = "app"
   }
 
+  const processWorkingDirectory = path.join(process.cwd(), appDir)
+  console.log("Installing production dependencies for arch " + (arch || process.arch) + " to " + processWorkingDirectory)
+
   const electronPrebuiltDep = packageJson.devDependencies["electron-prebuilt"]
   if (electronPrebuiltDep == null) {
     throw new Error("Cannot find electron-prebuilt dependency to get electron version")
@@ -45,9 +48,6 @@ exports.installDependencies = function (arch, appDir) {
   if (arch != null) {
     env.npm_config_arch = arch
   }
-
-  const processWorkingDirectory = path.join(process.cwd(), appDir)
-  console.log("Installing production dependencies to " + processWorkingDirectory)
 
   let npmExecPath = process.env.npm_execpath || process.env.NPM_CLI_JS
   let npmExecArgs = ["install"]

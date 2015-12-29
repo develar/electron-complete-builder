@@ -67,7 +67,6 @@ function checkMetadata() {
 
 function pack() {
   const currentArch = arch[currentArchIndex]
-  console.log("Installing dependencies for arch " + currentArch)
   util.installDependencies(currentArch)
 
   packager(Object.assign(appPackageJson.build || {}, {
