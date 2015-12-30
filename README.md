@@ -18,7 +18,7 @@ Part of your development `package.json`:
     "pack:osx": "build --platform=darwin",
     "pack:win": "build --platform=win32",
     "pack": "npm run pack:osx && npm run pack:win",
-    "build:osx": "build --build --platform=darwin --sign='Your indentity'",
+    "build:osx": "build --build --platform=darwin --sign='Your identity'",
     "build:win": "build --build --platform=win32",
     "build": "npm run build:osx && npm run build:win"
   }
@@ -29,19 +29,19 @@ In your application `package.json` custom "build" field should be specified:
 ```json
 "build": {
   "app-bundle-id": "your.id",
-  "app-category-type": "your.app.category.type",
+  "app-category-type": "your.app.category.type"
 }
 ```
 
 This object will be used as source of [electron-packager](https://www.npmjs.com/package/electron-packager) options. You can specify any other options here.
 
 # Auto Update
-electron-complete-builder produces all required arficats:
+electron-complete-builder produces all required artifacts:
 
 * .dmg: OS X installer, required for OS X user to initial install.
 * -mac.zip: required for Squirrel.Mac.
 * .exe and -x64.exe: Windows installer, required for Windows user to initial install. Please note — [your app must handle Squirrel.Windows events](https://github.com/mongodb-js/electron-installer-squirrel-windows#integration). See [real example](https://github.com/develar/onshape-desktop-shell/blob/master/src/WinSquirrelStartupEventHandler.ts). 
-* .nupkg: required for Squirrel.Windows.
+* .fix nupkg: required for Squirrel.Windows.
 
 You need to deploy somewhere [releases/downloads server](https://github.com/GitbookIO/nuts).
 

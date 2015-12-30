@@ -45,7 +45,7 @@ function computeOutDirectory() {
 
 function checkMetadata() {
   function error(missedFieldName) {
-    throw new Error("Please specify " + missedFieldName + " in the application package.json ('" + appPackageJsonFile + "')")
+    throw new Error("Please specify '" + missedFieldName + "' in the application package.json ('" + appPackageJsonFile + "')")
   }
 
   if (appPackageJson.name == null) {
