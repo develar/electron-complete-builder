@@ -1,5 +1,7 @@
 Complete solution to build ready for distribution and "auto update" installers of your app for OS X and Windows (Linux can be supported too).
 
+
+
 [Native application dependencies](http://electron.atom.io/docs/latest/tutorial/using-native-node-modules/) are supported.
 
 [electron-builder](https://github.com/loopline-systems/electron-builder),
@@ -32,3 +34,15 @@ In your application `package.json` custom "build" field should be specified:
 ```
 
 This object will be used as source of [electron-packager](https://www.npmjs.com/package/electron-packager) options. You can specify any other options here.
+
+# Auto Update
+electron-complete-builder produces all required arficats:
+
+* .dmg: OS X installer, required for OS X user to initial install.
+* -mac.zip: required for Squirrel.Mac.
+* .exe and -x64.exe: Windows installer, required for Windows user to initial install. Please note — [your app must handle Squirrel.Windows events](https://github.com/mongodb-js/electron-installer-squirrel-windows#integration). See [real example](https://github.com/develar/onshape-desktop-shell/blob/master/src/WinSquirrelStartupEventHandler.ts). 
+* .nupkg: required for Squirrel.Windows.
+
+You need to deploy somewhere [releases/downloads server](https://github.com/GitbookIO/nuts).
+
+In general, there is a possibility to setup it as a service for all (it is boring and stupid to setup own if cloud service is possible). May be I will setup it soon (feel free to file an issue to track progress). It is safe since you should sign your app in any case (so, even if server will be compromised, users will not be affected because OS X will just block unsigned/unidentified app).
