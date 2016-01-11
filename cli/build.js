@@ -21,7 +21,7 @@ checkMetadata()
 
 const version = appPackageJson.version
 
-const arch = args.platform == "darwin" ? ["x64"] : (args.arch == null || args.arch === "all" ? ["ia32", "x64"] : [args.arch])
+const arch = args.platform === "darwin" ? ["x64"] : (args.arch == null || args.arch === "all" ? ["ia32", "x64"] : [args.arch])
 let currentArchIndex = 0
 
 const distDir = path.join(process.cwd(), "dist")
