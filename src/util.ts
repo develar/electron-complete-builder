@@ -2,18 +2,26 @@
 
 const fs = require("fs")
 const path = require("path")
-const packageJson = readPackageJson(path.join(process.cwd(), "package.json"))
+export const packageJson = readPackageJson(path.join(process.cwd(), "package.json"))
 
-const DEFAULT_APP_DIR_NAME = "app"
+export const DEFAULT_APP_DIR_NAME = "app"
 
-function reportResult(result) {
+export const commonArgs: any[] = [
+  {
+    name: "appDir",
+    type: String,
+    description: "Relative (to the working directory) path to the folder containing the application package.json. Working directory or app/ by default."
+  }
+]
+
+export function reportResult(result: any) {
   if (result.status != 0) {
     console.error(result)
     throw result.error
   }
 }
 
-function readPackageJson(path) {
+export function readPackageJson(path: string) {
   try {
     return JSON.parse(fs.readFileSync(path))
   }
@@ -25,9 +33,9 @@ function readPackageJson(path) {
   }
 }
 
-exports.installDependencies = function (arch, appDir) {
+export function installDependencies(arch: string, appDir?: string) {
   if (appDir == null) {
-    appDir = "app"
+    appDir = DEFAULT_APP_DIR_NAME
   }
 
   const processWorkingDirectory = path.join(process.cwd(), appDir)
@@ -64,16 +72,3 @@ exports.installDependencies = function (arch, appDir) {
     env: env
   }))
 }
-
-exports.reportResult = reportResult
-exports.readPackageJson = readPackageJson
-exports.packageJson = packageJson
-
-exports.commonArgs = [
-  {
-    name: "appDir",
-    type: String,
-    defaultValue: DEFAULT_APP_DIR_NAME,
-    description: "Relative (to the working directory) path to the folder containing the application package.json"
-  }
-]

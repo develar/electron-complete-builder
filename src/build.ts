@@ -1,22 +1,31 @@
 #! /usr/bin/env node
 
-"use strict"
+import * as fs from "fs"
+import * as path from "path"
+import { DEFAULT_APP_DIR_NAME, reportResult, packageJson, commonArgs, readPackageJson, installDependencies } from "./util"
 
-const fs = require("fs")
-const path = require("path")
-const util = require("../main")
 const packager = require("electron-packager")
 
-const args = require("command-line-args")(util.commonArgs.concat(
+let isTwoPackageJsonProjectLayoutUsed = true
+
+interface AppArgs {
+  arch: string
+  build: boolean
+  sign?: string
+  platform: string
+  appDir?: string
+}
+
+const args: AppArgs = require("command-line-args")(commonArgs.concat(
   {name: "arch", type: String, defaultValue: "all"},
   {name: "build", type: Boolean, defaultValue: false},
   {name: "sign", type: String},
   {name: "platform", type: String, defaultValue: process.platform}
 )).parse()
 
-const appDir = path.normalize(path.join(process.cwd(), args.appDir))
-const appPackageJsonFile = path.normalize(path.join(appDir, "package.json"))
-const appPackageJson = util.readPackageJson(appPackageJsonFile)
+const appDir = computeAppDirectory()
+const appPackageJsonFile = path.join(appDir, "package.json")
+const appPackageJson = readPackageJson(appPackageJsonFile)
 checkMetadata()
 
 const version = appPackageJson.version
@@ -27,47 +36,19 @@ let currentArchIndex = 0
 const distDir = path.join(process.cwd(), "dist")
 const outDir = computeOutDirectory()
 
-console.log("Removing " + outDir)
+console.log("Removing %s", outDir)
 require("rimraf").sync(outDir)
 
 pack()
 
-function computeOutDirectory() {
-  let relativeDirectory
-  if (args.platform === "darwin") {
-    relativeDirectory = appPackageJson.name + "-darwin-x64"
-  }
-  else {
-    relativeDirectory = "win"
-  }
-  return path.join(distDir, relativeDirectory)
-}
-
-function checkMetadata() {
-  function error(missedFieldName) {
-    throw new Error("Please specify '" + missedFieldName + "' in the application package.json ('" + appPackageJsonFile + "')")
-  }
-
-  if (appPackageJson.name == null) {
-    error("name")
-  }
-  else if (appPackageJson.description == null) {
-    error("description")
-  }
-  else if (appPackageJson.version == null) {
-    error("version")
-  }
-  else if (appPackageJson.build == null) {
-    error("build")
-  }
-  else if (appPackageJson.author == null) {
-    error("author")
-  }
-}
-
 function pack() {
   const currentArch = arch[currentArchIndex]
-  util.installDependencies(currentArch)
+  if (isTwoPackageJsonProjectLayoutUsed) {
+    installDependencies(currentArch)
+  }
+  else {
+    console.log("Skipping app dependencies installation because dev and app dependencies are not separated")
+  }
 
   packager(Object.assign(appPackageJson.build || {}, {
     dir: appDir,
@@ -75,7 +56,7 @@ function pack() {
     name: appPackageJson.name,
     platform: args.platform,
     arch: currentArch,
-    version: util.packageJson.devDependencies["electron-prebuilt"].substring(1),
+    version: packageJson.devDependencies["electron-prebuilt"].substring(1),
     icon: path.join(process.cwd(), "build", "icon"),
     asar: true,
     "app-version": version,
@@ -89,9 +70,8 @@ function pack() {
       ProductName: appPackageJson.name,
       InternalName: appPackageJson.name,
     }
-  }), function (error) {
+  }), function (error: any) {
     if (error != null) {
-      //noinspection JSClosureCompilerSyntax
       throw new Error(error)
     }
 
@@ -107,11 +87,11 @@ function pack() {
   })
 }
 
-function build(arch, doneHandler) {
+function build(arch: string, doneHandler: () => void) {
   const appName = appPackageJson.name
   const appPath = path.join(outDir, appName + (args.platform === "darwin" ? ".app" : "-win32-" + arch))
 
-  const callback = function(error) {
+  const callback = function(error: any) {
     if (error != null) {
       //noinspection JSClosureCompilerSyntax
       throw new Error(error)
@@ -120,7 +100,7 @@ function build(arch, doneHandler) {
     if (args.platform === "darwin") {
       fs.renameSync(path.join(outDir, appName + ".dmg"), path.join(outDir, appName + "-" + version + ".dmg"))
       const spawnSync = require("child_process").spawnSync
-      util.reportResult(spawnSync("zip", ["-ryX", `${outDir}/${appName}-${version}-mac.zip`, appName + ".app"], {
+      reportResult(spawnSync("zip", ["-ryX", `${outDir}/${appName}-${version}-mac.zip`, appName + ".app"], {
         cwd: outDir,
         stdio: "inherit",
       }))
@@ -153,5 +133,67 @@ function build(arch, doneHandler) {
       authors: appPackageJson.author,
       setup_icon: path.join(process.cwd(), "build", "icon.ico"),
     }, callback)
+  }
+}
+
+// Auto-detect app/ (two package.json project layout (development and app)) or fallback to use working directory if not explicitly specified
+function computeAppDirectory() {
+  let customAppPath = args.appDir
+  let required = true
+  if (customAppPath == null) {
+    customAppPath = DEFAULT_APP_DIR_NAME
+    required = false
+  }
+
+  let absoluteAppPath = path.normalize(path.join(process.cwd(), customAppPath))
+  try {
+    fs.accessSync(absoluteAppPath)
+  }
+  catch (e) {
+    if (required) {
+      throw new Error(customAppPath + " doesn't exists, " + e.message)
+    }
+    else {
+      isTwoPackageJsonProjectLayoutUsed = false
+      return process.cwd()
+    }
+  }
+  return absoluteAppPath
+}
+
+function computeOutDirectory() {
+  let relativeDirectory: string
+  if (args.platform === "darwin") {
+    relativeDirectory = appPackageJson.name + "-darwin-x64"
+  }
+  else {
+    relativeDirectory = "win"
+  }
+  return path.join(distDir, relativeDirectory)
+}
+
+function checkMetadata() {
+  function error(missedFieldName: string) {
+    throw new Error("Please specify '" + missedFieldName + "' in the application package.json ('" + appPackageJsonFile + "')")
+  }
+
+  if (appPackageJson.name == null) {
+    error("name")
+  }
+  else if (appPackageJson.description == null) {
+    error("description")
+  }
+  else if (appPackageJson.version == null) {
+    error("version")
+  }
+  else if (appPackageJson.build == null) {
+    throw new Error("Please specify 'build' configuration in the application package.json ('" + appPackageJsonFile + "'), at least\n\n" +
+        '\t"build": {\n' +
+        '\t  "app-bundle-id": "your.id",\n' +
+        '\t  "app-category-type": "your.app.category.type"\n'
+        + '\t}' + "\n\n is required.\n")
+  }
+  else if (appPackageJson.author == null) {
+    error("author")
   }
 }
