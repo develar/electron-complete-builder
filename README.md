@@ -41,7 +41,7 @@ electron-complete-builder produces all required artifacts:
 * .dmg: OS X installer, required for OS X user to initial install.
 * -mac.zip: required for Squirrel.Mac.
 * .exe and -x64.exe: Windows installer, required for Windows user to initial install. Please note — [your app must handle Squirrel.Windows events](https://github.com/mongodb-js/electron-installer-squirrel-windows#integration). See [real example](https://github.com/develar/onshape-desktop-shell/blob/master/src/WinSquirrelStartupEventHandler.ts). 
-* .fix nupkg: required for Squirrel.Windows.
+* .full-nupkg: required for Squirrel.Windows.
 
 You need to deploy somewhere [releases/downloads server](https://github.com/GitbookIO/nuts).
 
