@@ -2,6 +2,7 @@
   <dictionary name="develar">
     <words>
       <w>disturl</w>
+      <w>globaldots</w>
       <w>postinstall</w>
     </words>
   </dictionary>

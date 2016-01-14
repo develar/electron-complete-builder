@@ -3,8 +3,11 @@
 import * as fs from "fs"
 import * as path from "path"
 import { DEFAULT_APP_DIR_NAME, reportResult, packageJson, commonArgs, readPackageJson, installDependencies } from "./util"
+import { spawn } from "child_process"
 
 const packager = require("electron-packager")
+const series = require("run-series")
+const parallel = require("run-parallel")
 
 let isTwoPackageJsonProjectLayoutUsed = true
 
@@ -30,21 +33,74 @@ checkMetadata()
 
 const version = appPackageJson.version
 
-const arch = args.platform === "darwin" ? ["x64"] : (args.arch == null || args.arch === "all" ? ["ia32", "x64"] : [args.arch])
-let currentArchIndex = 0
-
 const distDir = path.join(process.cwd(), "dist")
 const outDir = computeOutDirectory()
 
 console.log("Removing %s", outDir)
 require("rimraf").sync(outDir)
 
-pack()
+const tasks: Array<((callback: (error: any, result: any) => void) => void)> = []
+for (let arch of args.platform === "darwin" ? ["x64"] : (args.arch == null || args.arch === "all" ? ["ia32", "x64"] : [args.arch])) {
+  tasks.push(pack.bind(null, arch))
+  if (args.build) {
+    const distPath = path.join(outDir, appPackageJson.name + (args.platform === "darwin" ? ".app" : "-win32-" + arch))
+    const buildTask = build.bind(null, arch, distPath)
+    if (args.platform === "darwin") {
+      tasks.push((callback: () => void) => {
+        //noinspection JSReferencingMutableVariableFromClosure
+        parallel([buildTask, zipMacApp], callback)
+      })
+    }
+    else {
+      tasks.push(buildTask)
+    }
+    tasks.push(adjustDistLayout.bind(null, arch))
+  }
+}
 
-function pack() {
-  const currentArch = arch[currentArchIndex]
+function zipMacApp(callback: (error?: any, result?: any) => void) {
+  console.log("Zipping app")
+  const appName = appPackageJson.name
+  // -y param is important - "store symbolic links as the link instead of the referenced file"
+  spawn("zip", ["-ryXq", `${outDir}/${appName}-${version}-mac.zip`, appName + ".app"], {
+    cwd: outDir,
+    stdio: "inherit",
+  })
+    .on("close", (exitCode: number) => {
+      console.log("Finished zipping app")
+      callback(exitCode === 0 ? null : "Failed, exit code " + exitCode)
+    })
+}
+
+function adjustDistLayout(arch: string, callback: (error?: any, result?: any) => void) {
+  const appName = appPackageJson.name
+  if (args.platform === "darwin") {
+    fs.rename(path.join(outDir, appName + ".dmg"), path.join(outDir, appName + "-" + version + ".dmg"), callback)
+  }
+  else {
+    fs.rename(path.join(outDir, arch, appName + "Setup.exe"), path.join(outDir, appName + "Setup-" + version + ((arch === "x64") ? "-x64" : "") + ".exe"), callback)
+  }
+}
+
+series(tasks, (error: any) => {
+  if (error != null) {
+    if (typeof error === "string") {
+      console.error(error)
+    }
+    else if (error.message == null) {
+      console.error(error, error.stack)
+    }
+    else {
+      console.error(error.message)
+    }
+
+    process.exit(1)
+  }
+})
+
+function pack(arch: string, callback: (error: any, result: any) => void) {
   if (isTwoPackageJsonProjectLayoutUsed) {
-    installDependencies(currentArch)
+    installDependencies(arch)
   }
   else {
     console.log("Skipping app dependencies installation because dev and app dependencies are not separated")
@@ -55,13 +111,13 @@ function pack() {
     out: args.platform === "win32" ? path.join(distDir, "win") : distDir,
     name: appPackageJson.name,
     platform: args.platform,
-    arch: currentArch,
+    arch: arch,
     version: packageJson.devDependencies["electron-prebuilt"].substring(1),
     icon: path.join(process.cwd(), "build", "icon"),
     asar: true,
     "app-version": version,
     "build-version": version,
-    sign: args.sign,
+    sign: args.sign || process.env.CSC_NAME,
     "version-string": {
       CompanyName: appPackageJson.authors,
       FileDescription: appPackageJson.description,
@@ -70,53 +126,13 @@ function pack() {
       ProductName: appPackageJson.name,
       InternalName: appPackageJson.name,
     }
-  }), function (error: any) {
-    if (error != null) {
-      throw new Error(error)
-    }
-
-    currentArchIndex++
-    if (args.build) {
-      build(currentArch, currentArchIndex < arch.length ? function () {
-        pack()
-      } : null)
-    }
-    else if (currentArchIndex < arch.length) {
-      pack()
-    }
-  })
+  }), callback)
 }
 
-function build(arch: string, doneHandler: () => void) {
-  const appName = appPackageJson.name
-  const appPath = path.join(outDir, appName + (args.platform === "darwin" ? ".app" : "-win32-" + arch))
-
-  const callback = function(error: any) {
-    if (error != null) {
-      //noinspection JSClosureCompilerSyntax
-      throw new Error(error)
-    }
-
-    if (args.platform === "darwin") {
-      fs.renameSync(path.join(outDir, appName + ".dmg"), path.join(outDir, appName + "-" + version + ".dmg"))
-      const spawnSync = require("child_process").spawnSync
-      reportResult(spawnSync("zip", ["-ryX", `${outDir}/${appName}-${version}-mac.zip`, appName + ".app"], {
-        cwd: outDir,
-        stdio: "inherit",
-      }))
-    }
-    else {
-      fs.renameSync(path.join(outDir, arch, appName + "Setup.exe"), path.join(outDir, appName + "Setup-" + version + ((arch === "x64") ? "-x64" : "") + ".exe"))
-    }
-
-    if (doneHandler != null) {
-      doneHandler()
-    }
-  }
-
+function build(arch: string, distPath: string, callback: (error: any, result: any) => void) {
   if (args.platform === "darwin") {
     require("electron-builder").init().build({
-      "appPath": appPath,
+      "appPath": distPath,
       "platform": args.platform === "darwin" ? "osx" : (args.platform == "win32" ? "win" : args.platform),
       "out": outDir,
       "config": path.join(process.cwd(), "build", "packager.json"),
@@ -125,7 +141,7 @@ function build(arch: string, doneHandler: () => void) {
   else {
     require('electron-installer-squirrel-windows')({
       name: appPackageJson.name,
-      path: appPath,
+      path: distPath,
       product_name: appPackageJson.name,
       out: path.join(outDir, arch),
       version: version,
@@ -188,10 +204,10 @@ function checkMetadata() {
   }
   else if (appPackageJson.build == null) {
     throw new Error("Please specify 'build' configuration in the application package.json ('" + appPackageJsonFile + "'), at least\n\n" +
-        '\t"build": {\n' +
-        '\t  "app-bundle-id": "your.id",\n' +
-        '\t  "app-category-type": "your.app.category.type"\n'
-        + '\t}' + "\n\n is required.\n")
+      '\t"build": {\n' +
+      '\t  "app-bundle-id": "your.id",\n' +
+      '\t  "app-category-type": "your.app.category.type"\n'
+      + '\t}' + "\n\n is required.\n")
   }
   else if (appPackageJson.author == null) {
     error("author")

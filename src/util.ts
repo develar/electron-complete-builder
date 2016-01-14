@@ -16,8 +16,10 @@ export const commonArgs: any[] = [
 
 export function reportResult(result: any) {
   if (result.status != 0) {
-    console.error(result)
-    throw result.error
+    if (result.error != null) {
+      console.error(result.error)
+    }
+    process.exit(result.status)
   }
 }
 
@@ -46,7 +48,7 @@ export function installDependencies(arch: string, appDir?: string) {
     throw new Error("Cannot find electron-prebuilt dependency to get electron version")
   }
 
-  const env = Object.assign(process.env, {
+  const env = Object.assign({}, process.env, {
     npm_config_disturl: "https://atom.io/download/atom-shell",
     npm_config_target: electronPrebuiltDep.substring(1),
     npm_config_runtime: "electron",

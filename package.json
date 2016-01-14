@@ -1,6 +1,6 @@
 {
   "name": "electron-complete-builder",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "MIT",
   "bin": {
     "install-app-deps": "./out/install-app-deps.js",
@@ -13,11 +13,13 @@
     "command-line-args": "^2.1.4",
     "electron-builder": "^2.6.0",
     "electron-installer-squirrel-windows": "^1.2.2",
-    "electron-packager": "^5.2.0"
+    "electron-packager": "^5.2.0",
+    "run-parallel": "^1.1.4",
+    "run-series": "^1.1.4"
   },
   "devDependencies": {
     "rimraf": "^2.5.0",
-    "tsconfig-glob": "^0.3.3",
+    "tsconfig-glob": "^0.4.0",
     "typescript": "^1.8.0-dev.20160113"
   },
   "engines": {
