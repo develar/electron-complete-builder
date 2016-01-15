@@ -19,6 +19,7 @@ describe("Code Sign", function () {
       }
 
       assertThat(keychainName).not.empty()
+      assertThat(process.env.CSC_NAME).equal("FooBar")
       done(null)
     })
   })

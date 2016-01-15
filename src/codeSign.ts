@@ -2,12 +2,14 @@ import * as fs from "fs"
 import { execFile } from "child_process"
 import { parallelTask, seriesTask } from "./util"
 import { download } from "./httpRequest"
+import { tmpdir } from "os"
+import * as path from "path"
 
 const keyChainName = "csc.keychain"
+const developerCertPath = path.join(tmpdir(), "developer.p12")
 
 export function createKeychain(callback: (error: any, keychainName: string) => void) {
-  const developerCertPath = "/tmp/developer.p12"
-  const appleCertPath = "/tmp/apple.cer"
+  const appleCertPath = path.join(tmpdir(), "apple.cer")
 
   seriesTask(
     parallelTask(
@@ -23,11 +25,34 @@ export function createKeychain(callback: (error: any, keychainName: string) => v
     ),
     (callback) => { execFile("security", ["import", appleCertPath, "-k", keyChainName, "-T", "/usr/bin/codesign"], callback) },
     (callback) => { execFile("security", ["import", developerCertPath, "-k", keyChainName, "-T", "/usr/bin/codesign", "-P", process.env.CSC_KEY_PASSWORD], callback) },
+    extractCommonName
+  )((error: any) => {
+    // delete temp files in final callback - to delete if error occurred
     parallelTask(
       fs.unlink.bind(fs, appleCertPath),
       fs.unlink.bind(fs, developerCertPath)
-    ))((error: any) => {
-    callback(error, keyChainName)
+    )((deleteTempFilesError: any) => {
+      callback(error || deleteTempFilesError, keyChainName)
+    })
+  })
+}
+
+function extractCommonName(callback: (error: any) => void) {
+  //noinspection JSUnusedLocalSymbols
+  execFile("openssl", ["pkcs12", "-nokeys", "-nodes", "-passin", "pass:" + process.env.CSC_KEY_PASSWORD, "-nomacver", "-clcerts", "-in", developerCertPath], (error: Error, output: Buffer, errorOutput: Buffer) => {
+    if (error != null) {
+      callback(error)
+      return
+    }
+
+    const match = output.toString().match(/^subject.*\/CN=([^\/]+)/m)
+    if (match == null || match[1] == null) {
+      callback("Cannot extract common name from p12")
+    }
+    else {
+      process.env.CSC_NAME = match[1]
+      callback(null)
+    }
   })
 }
 

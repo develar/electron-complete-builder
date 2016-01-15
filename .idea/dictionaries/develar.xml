@@ -1,8 +1,13 @@
 <component name="ProjectDictionaryState">
   <dictionary name="develar">
     <words>
+      <w>clcerts</w>
       <w>disturl</w>
       <w>globaldots</w>
+      <w>nokeys</w>
+      <w>nomacver</w>
+      <w>passin</w>
+      <w>pkcs</w>
       <w>postinstall</w>
       <w>rimraf</w>
     </words>
