@@ -146,15 +146,15 @@ function pack(arch: string, callback: (error: any, result: any) => void) {
 
 function build(arch: string, distPath: string, callback: (error: any, result: any) => void) {
   if (args.platform === "darwin") {
-    require("electron-builder").init().build({
+    require("electron-builder").init().build(merge(appPackageJson.darwinPackager || {}, {
       "appPath": distPath,
       "platform": args.platform === "darwin" ? "osx" : (args.platform == "win32" ? "win" : args.platform),
       "out": outDir,
       "config": path.join(process.cwd(), "build", "packager.json"),
-    }, callback)
+    }), callback)
   }
   else {
-    require('electron-installer-squirrel-windows')({
+    require('electron-installer-squirrel-windows')(merge(appPackageJson.windowsPackager || {}, {
       name: appPackageJson.name,
       path: distPath,
       product_name: appPackageJson.name,
@@ -163,7 +163,7 @@ function build(arch: string, distPath: string, callback: (error: any, result: an
       description: appPackageJson.description,
       authors: appPackageJson.author,
       setup_icon: path.join(process.cwd(), "build", "icon.ico"),
-    }, callback)
+    }), callback)
   }
 }
 
