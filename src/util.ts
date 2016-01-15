@@ -2,6 +2,10 @@
 
 const fs = require("fs")
 const path = require("path")
+const series = require("run-series")
+const parallel = require("run-parallel")
+const merge = require("merge")
+
 export const packageJson = readPackageJson(path.join(process.cwd(), "package.json"))
 
 export const DEFAULT_APP_DIR_NAME = "app"
@@ -48,7 +52,7 @@ export function installDependencies(arch: string, appDir?: string) {
     throw new Error("Cannot find electron-prebuilt dependency to get electron version")
   }
 
-  const env = Object.assign({}, process.env, {
+  const env = merge(process.env, {
     npm_config_disturl: "https://atom.io/download/atom-shell",
     npm_config_target: electronPrebuiltDep.substring(1),
     npm_config_runtime: "electron",
@@ -73,4 +77,33 @@ export function installDependencies(arch: string, appDir?: string) {
     stdio: "inherit",
     env: env
   }))
+}
+
+export function parallelTask(...tasks: ((error?: any) => void)[]) {
+  return parallel.bind(null, tasks)
+}
+
+export function seriesTask(...tasks: ((error?: any) => void)[]) {
+  return series.bind(null, tasks)
+}
+
+// typescript cannot infer function parameters type if use push directly
+function createTasks(...callbacks: ((error?: any) => void)[]) {
+  return callbacks
+}
+
+// typescript cannot infer function parameters type if use push directly
+function addTasks(target: Array<((callback: (error: any, result: any) => void) => void)>, ...tasks: ((error?: any) => void)[]): void {
+  target.push.apply(target, tasks)
+}
+
+function task(dependencies: string[], task: (callback: (error?: any) => void) => void): Array<((callback: (error: any, result: any) => void) => void) | string> {
+  if (dependencies == null) {
+    return [task]
+  }
+
+  const result = Array<any>(dependencies.length + 1)
+  result.push.apply(result, dependencies)
+  result.push(task)
+  return result
 }

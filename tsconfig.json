@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "target": "es6",
+    "target": "es5",
     "noImplicitAny": true,
     "removeComments": true,
     "outDir": "out",
@@ -17,7 +17,10 @@
   ],
   "files": [
     "typings/node/node.d.ts",
+    "typings/run.d.ts",
     "src/build.ts",
+    "src/codeSign.ts",
+    "src/httpRequest.ts",
     "src/install-app-deps.ts",
     "src/util.ts"
   ]

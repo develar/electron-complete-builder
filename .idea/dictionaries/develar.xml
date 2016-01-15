@@ -4,6 +4,7 @@
       <w>disturl</w>
       <w>globaldots</w>
       <w>postinstall</w>
+      <w>rimraf</w>
     </words>
   </dictionary>
 </component>

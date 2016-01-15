@@ -2,12 +2,15 @@
 
 import * as fs from "fs"
 import * as path from "path"
-import { DEFAULT_APP_DIR_NAME, reportResult, packageJson, commonArgs, readPackageJson, installDependencies } from "./util"
+import { DEFAULT_APP_DIR_NAME, packageJson, commonArgs, readPackageJson, installDependencies } from "./util"
 import { spawn } from "child_process"
+import { createKeychain } from "./codeSign"
+const merge = require("merge")
 
 const packager = require("electron-packager")
 const series = require("run-series")
 const parallel = require("run-parallel")
+const auto = require("run-auto")
 
 let isTwoPackageJsonProjectLayoutUsed = true
 
@@ -40,6 +43,11 @@ console.log("Removing %s", outDir)
 require("rimraf").sync(outDir)
 
 const tasks: Array<((callback: (error: any, result: any) => void) => void)> = []
+
+if (process.env.CSC_LINK != null && process.env.CSC_KEY_PASSWORD != null) {
+  tasks.push(createKeychain)
+}
+
 for (let arch of args.platform === "darwin" ? ["x64"] : (args.arch == null || args.arch === "all" ? ["ia32", "x64"] : [args.arch])) {
   tasks.push(pack.bind(null, arch))
   if (args.build) {
@@ -57,6 +65,22 @@ for (let arch of args.platform === "darwin" ? ["x64"] : (args.arch == null || ar
     tasks.push(adjustDistLayout.bind(null, arch))
   }
 }
+
+series(tasks, (error: any) => {
+  if (error != null) {
+    if (typeof error === "string") {
+      console.error(error)
+    }
+    else if (error.message == null) {
+      console.error(error, error.stack)
+    }
+    else {
+      console.error(error.message)
+    }
+
+    process.exit(1)
+  }
+})
 
 function zipMacApp(callback: (error?: any, result?: any) => void) {
   console.log("Zipping app")
@@ -82,22 +106,6 @@ function adjustDistLayout(arch: string, callback: (error?: any, result?: any) =>
   }
 }
 
-series(tasks, (error: any) => {
-  if (error != null) {
-    if (typeof error === "string") {
-      console.error(error)
-    }
-    else if (error.message == null) {
-      console.error(error, error.stack)
-    }
-    else {
-      console.error(error.message)
-    }
-
-    process.exit(1)
-  }
-})
-
 function pack(arch: string, callback: (error: any, result: any) => void) {
   if (isTwoPackageJsonProjectLayoutUsed) {
     installDependencies(arch)
@@ -106,7 +114,7 @@ function pack(arch: string, callback: (error: any, result: any) => void) {
     console.log("Skipping app dependencies installation because dev and app dependencies are not separated")
   }
 
-  packager(Object.assign(appPackageJson.build || {}, {
+  packager(merge(appPackageJson.build || {}, {
     dir: appDir,
     out: args.platform === "win32" ? path.join(distDir, "win") : distDir,
     name: appPackageJson.name,

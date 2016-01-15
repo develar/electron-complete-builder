@@ -1163,7 +1163,7 @@ declare module "fs" {
         close(): void;
     }
     export interface WriteStream extends stream.Writable {
-        close(): void;
+        close(cb: Function): void;
         bytesWritten: number;
     }
 
