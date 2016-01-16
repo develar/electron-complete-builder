@@ -230,7 +230,7 @@ export class Packager {
       icon: path.join(process.cwd(), "build", "icon"),
       asar: true,
       "app-version": this.metadata.version,
-      "build-version": this.metadata,
+      "build-version": this.metadata.version,
       sign: macCscName,
       "version-string": {
         CompanyName: this.metadata.author,

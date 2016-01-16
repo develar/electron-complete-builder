@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "mocha": "^2.3.4",
+    "plist": "^1.2.0",
     "rimraf": "^2.5.0",
     "should": "^8.1.1",
     "tsconfig-glob": "^0.4.0",

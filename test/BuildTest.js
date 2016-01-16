@@ -1,8 +1,9 @@
 const assertThat = require("should/as-function")
-const packager = require("../out/build")
 const childProcess = require("child_process")
 const path = require("path")
 const merge = require("merge")
+const fs = require('fs')
+const plist = require("plist")
 
 describe("Build", function () {
   // default 2 seconds is not enough
@@ -24,6 +25,13 @@ describe("Build", function () {
           return
         }
 
+        const info = plist.parse(fs.readFileSync(__dirname + "/testApp/dist/TestApp-darwin-x64/TestApp.app/Contents/Info.plist", "utf8"));
+        assertThat(info).have.properties({
+          CFBundleDisplayName: "TestApp",
+          CFBundleIdentifier: "your.id",
+          LSApplicationCategoryType: "your.app.category.type",
+          CFBundleVersion: "1.0.0"
+        })
         done()
       })
   })
