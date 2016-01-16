@@ -7,6 +7,9 @@ process.env.CSC_KEY_PASSWORD = "password"
 process.env.TEST_MODE = "true"
 
 describe("Code Sign", function () {
+  // default 2 seconds is not enough
+  this.timeout(10 * 1000)
+
   afterEach(function (done) {
     codeSign.deleteKeychain(done)
   })

@@ -1,6 +1,6 @@
 {
   "name": "electron-complete-builder",
-  "version": "0.3.1",
+  "version": "0.4.0-beta.0",
   "license": "MIT",
   "bin": {
     "install-app-deps": "./out/install-app-deps.js",
@@ -8,7 +8,8 @@
   },
   "scripts": {
     "compile": "rimraf out && tsconfig -i 2 && tsc",
-    "test": "mocha"
+    "test": "mocha",
+    "preversion": "npm prune && npm run compile && npm test"
   },
   "dependencies": {
     "command-line-args": "^2.1.4",

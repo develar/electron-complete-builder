@@ -56,7 +56,8 @@ export CSC_NAME="Developer ID Application: Your Name (code)"
 ## Travis
 ... not yet works, in progress ...
 
-To sign app on Travis server,
+To sign app on Travis server:
+
 1. [Export](https://developer.apple.com/library/ios/documentation/IDEs/Conceptual/AppDistributionGuide/MaintainingCertificates/MaintainingCertificates.html#//apple_ref/doc/uid/TP40012582-CH31-SW7) certificate,
 2. Upload *.p12` file (e.g. on [Google Drive](http://www.syncwithtech.org/p/direct-download-link-generator.html)),
 3. [Set](https://docs.travis-ci.com/user/environment-variables/#Encrypted-Variables) `CSC_LINK` and `CSC_KEY_PASSWORD` environment variables:
