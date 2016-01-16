@@ -52,7 +52,7 @@ export function installDependencies(arch: string, appDir?: string) {
     throw new Error("Cannot find electron-prebuilt dependency to get electron version")
   }
 
-  const env = merge(process.env, {
+  const env = merge(true, process.env, {
     npm_config_disturl: "https://atom.io/download/atom-shell",
     npm_config_target: electronPrebuiltDep.substring(1),
     npm_config_runtime: "electron",

@@ -1,6 +1,6 @@
 {
   "name": "electron-complete-builder",
-  "version": "0.4.0-beta.0",
+  "version": "0.4.0",
   "license": "MIT",
   "bin": {
     "install-app-deps": "./out/install-app-deps.js",
