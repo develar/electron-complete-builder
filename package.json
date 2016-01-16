@@ -4,7 +4,7 @@
   "license": "MIT",
   "bin": {
     "install-app-deps": "./out/install-app-deps.js",
-    "build": "./out/build.js"
+    "build": "./out/build-cli.js"
   },
   "scripts": {
     "compile": "rimraf out && tsconfig -i 2 && tsc",
@@ -20,9 +20,6 @@
     "run-parallel": "^1.1.4",
     "run-series": "^1.1.4"
   },
-  "optionalDependencies": {
-    "x509": "^0.2.3"
-  },
   "devDependencies": {
     "mocha": "^2.3.4",
     "rimraf": "^2.5.0",
@@ -33,5 +30,28 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/develar/electron-complete-builder.git"
-  }
+  },
+  "engines": {
+    "node": ">=0.4.0"
+  },
+  "keywords": [
+    "electron",
+    "builder",
+    "build",
+    "installer",
+    "install",
+    "packager",
+    "pack",
+    "nsis",
+    "appdmg",
+    "app",
+    "dmg",
+    "msi",
+    "exe",
+    "setup",
+    "Windows",
+    "OS X",
+    "Mac",
+    "sign"
+  ]
 }

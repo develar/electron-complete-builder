@@ -5,10 +5,17 @@ import { download } from "./httpRequest"
 import { tmpdir } from "os"
 import * as path from "path"
 
-const keyChainName = "csc.keychain"
+const crypto = require("crypto")
+const keychainName = "csc-" + crypto.randomBytes(16).toString("hex") + "keychain"
 const developerCertPath = path.join(tmpdir(), "developer.p12")
+let cscName: string = null
 
-export function createKeychain(callback: (error: any, keychainName: string) => void) {
+export interface CodeSigningInfo {
+  cscName: string
+  cscKeychainName: string
+}
+
+export function createKeychain(callback: (error: Error|string, result: CodeSigningInfo) => void) {
   const appleCertPath = path.join(tmpdir(), "apple.cer")
 
   seriesTask(
@@ -16,15 +23,13 @@ export function createKeychain(callback: (error: any, keychainName: string) => v
       (callback) => { download("https://developer.apple.com/certificationauthority/AppleWWDRCA.cer", appleCertPath, callback) },
       (callback) => { download(process.env.CSC_LINK, developerCertPath, callback) },
       seriesTask(
-        (callback) => { execFile("security", ["create-keychain", "-p", "travis", keyChainName], callback) },
-        (callback) => { process.env.TEST_MODE === "true" ? callback(null) : execFile("security", ["default-keychain", "-s", keyChainName], callback) },
-        (callback) => { execFile("security", ["unlock-keychain", "-p", "travis", keyChainName], callback) },
-        (callback) => { execFile("security", ["unlock-keychain", "-p", "travis", keyChainName], callback) },
-        (callback) => { execFile("security", ["set-keychain-settings", "-t", "3600", "-u", keyChainName], callback) }
+        (callback) => { execFile("security", ["create-keychain", "-p", "travis", keychainName], callback) },
+        (callback) => { execFile("security", ["unlock-keychain", "-p", "travis", keychainName], callback) },
+        (callback) => { execFile("security", ["set-keychain-settings", "-t", "3600", "-u", keychainName], callback) }
       )
     ),
-    (callback) => { execFile("security", ["import", appleCertPath, "-k", keyChainName, "-T", "/usr/bin/codesign"], callback) },
-    (callback) => { execFile("security", ["import", developerCertPath, "-k", keyChainName, "-T", "/usr/bin/codesign", "-P", process.env.CSC_KEY_PASSWORD], callback) },
+    (callback) => { execFile("security", ["import", appleCertPath, "-k", keychainName, "-T", "/usr/bin/codesign"], callback) },
+    (callback) => { execFile("security", ["import", developerCertPath, "-k", keychainName, "-T", "/usr/bin/codesign", "-P", process.env.CSC_KEY_PASSWORD], callback) },
     extractCommonName
   )((error: any) => {
     // delete temp files in final callback - to delete if error occurred
@@ -32,7 +37,10 @@ export function createKeychain(callback: (error: any, keychainName: string) => v
       fs.unlink.bind(fs, appleCertPath),
       fs.unlink.bind(fs, developerCertPath)
     )((deleteTempFilesError: any) => {
-      callback(error || deleteTempFilesError, keyChainName)
+      callback(error || deleteTempFilesError, {
+        cscName: cscName,
+        cscKeychainName: keychainName
+      })
     })
   })
 }
@@ -50,12 +58,12 @@ function extractCommonName(callback: (error: any) => void) {
       callback("Cannot extract common name from p12")
     }
     else {
-      process.env.CSC_NAME = match[1]
+      cscName = match[1]
       callback(null)
     }
   })
 }
 
 export function deleteKeychain(callback: (error: any) => void) {
-  execFile("security", ["delete-keychain", keyChainName], callback)
+  execFile("security", ["delete-keychain", keychainName], callback)
 }

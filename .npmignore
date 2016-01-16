@@ -4,3 +4,4 @@ src/
 tsconfig.json
 tsd.json
 npm-debug.log
+test/

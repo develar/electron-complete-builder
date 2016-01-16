@@ -79,6 +79,24 @@ export function installDependencies(arch: string, appDir?: string) {
   }))
 }
 
+export function handler<T>(callback: (error: Error|string) => void, handler: (result: T) => void) {
+  return function (error: Error|string, result: T): void {
+    if (error == null) {
+      try {
+        handler(result)
+      }
+      catch (e) {
+        callback(e)
+        return
+      }
+      callback(null)
+    }
+    else {
+      callback(error)
+    }
+  }
+}
+
 export function parallelTask(...tasks: ((error?: any) => void)[]) {
   return parallel.bind(null, tasks)
 }
@@ -93,7 +111,7 @@ function createTasks(...callbacks: ((error?: any) => void)[]) {
 }
 
 // typescript cannot infer function parameters type if use push directly
-function addTasks(target: Array<((callback: (error: any, result: any) => void) => void)>, ...tasks: ((error?: any) => void)[]): void {
+export function addTasks(target: Array<((callback: (error: any, result: any) => void) => void)>, ...tasks: ((error?: any) => void)[]): void {
   target.push.apply(target, tasks)
 }
 

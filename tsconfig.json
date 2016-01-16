@@ -18,6 +18,7 @@
   "files": [
     "typings/node/node.d.ts",
     "typings/run.d.ts",
+    "src/build-cli.ts",
     "src/build.ts",
     "src/codeSign.ts",
     "src/httpRequest.ts",

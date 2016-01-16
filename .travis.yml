@@ -1,0 +1,22 @@
+language: node_js
+node_js:
+  - '4'
+  - '5'
+
+cache:
+  - apt
+  directories:
+  - node_modules
+  - test/testApp/node_modules
+  - $HOME/.electron
+  - $HOME/.npm
+
+install:
+- npm prune
+- npm install
+- npm run compile
+
+addons:
+  apt:
+    packages:
+    - wine

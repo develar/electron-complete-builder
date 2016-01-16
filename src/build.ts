@@ -1,230 +1,293 @@
-#! /usr/bin/env node
-
 import * as fs from "fs"
 import * as path from "path"
-import { DEFAULT_APP_DIR_NAME, packageJson, commonArgs, readPackageJson, installDependencies } from "./util"
-import { spawn } from "child_process"
-import { createKeychain, deleteKeychain } from "./codeSign"
+import {
+  DEFAULT_APP_DIR_NAME,
+  packageJson,
+  readPackageJson,
+  installDependencies,
+  parallelTask,
+  addTasks,
+  handler
+} from "./util"
+import { spawn, execFile } from "child_process"
+import { createKeychain, deleteKeychain, CodeSigningInfo } from "./codeSign"
+
 const merge = require("merge")
 
 const packager = require("electron-packager")
 const series = require("run-series")
 const parallel = require("run-parallel")
 
-let isTwoPackageJsonProjectLayoutUsed = true
+export interface Options {
+  arch?: string
 
-interface AppArgs {
-  arch: string
-  build: boolean
+  dist?: boolean
+
   sign?: string
-  platform: string
+  platform?: string
   appDir?: string
 }
 
-const args: AppArgs = require("command-line-args")(commonArgs.concat(
-  {name: "arch", type: String, defaultValue: "all"},
-  {name: "build", type: Boolean, defaultValue: false},
-  {name: "sign", type: String},
-  {name: "platform", type: String, defaultValue: process.platform}
-)).parse()
+interface AppMetadata {
+  version: string
+  name: string
+  description: string
+  author: string
 
-const appDir = computeAppDirectory()
-const appPackageJsonFile = path.join(appDir, "package.json")
-const appPackageJson = readPackageJson(appPackageJsonFile)
-checkMetadata()
+  build: BuildMetadata
 
-const version = appPackageJson.version
-
-const distDir = path.join(process.cwd(), "dist")
-const outDir = computeOutDirectory()
-
-console.log("Removing %s", outDir)
-require("rimraf").sync(outDir)
-
-const tasks: Array<((callback: (error: any, result: any) => void) => void)> = []
-const cleanupTasks: Array<((callback: (error: any, result: any) => void) => void)> = []
-
-if (process.env.CSC_LINK != null && process.env.CSC_KEY_PASSWORD != null) {
-  tasks.push(createKeychain)
-  cleanupTasks.push(deleteKeychain)
+  windowsPackager: any
+  darwinPackager: any
 }
 
-for (let arch of args.platform === "darwin" ? ["x64"] : (args.arch == null || args.arch === "all" ? ["ia32", "x64"] : [args.arch])) {
-  tasks.push(pack.bind(null, arch))
-  if (args.build) {
-    const distPath = path.join(outDir, appPackageJson.name + (args.platform === "darwin" ? ".app" : "-win32-" + arch))
-    const buildTask = build.bind(null, arch, distPath)
-    if (args.platform === "darwin") {
-      tasks.push((callback: () => void) => {
-        //noinspection JSReferencingMutableVariableFromClosure
-        parallel([buildTask, zipMacApp], callback)
-      })
-    }
-    else {
-      tasks.push(buildTask)
-    }
-    tasks.push(adjustDistLayout.bind(null, arch))
+interface BuildMetadata {
+
+}
+
+export function setDefaultOptionValues(options: Options) {
+  if (options.arch == null) {
+    options.arch = "all"
+  }
+  if (options.platform == null) {
+    options.platform = process.platform
   }
 }
 
-series(tasks, (error: any) => {
-  parallel(cleanupTasks, (cleanupError: any) => {
-    if (error == null) {
-      error = cleanupError
-    }
+export class Packager {
+  private appDir: string
+  private appPackageFile: string
 
-    if (error != null) {
-      if (typeof error === "string") {
-        console.error(error)
-      }
-      else if (error.message == null) {
-        console.error(error, error.stack)
+  private outDir: string
+  private distDir: string
+
+  private metadata: AppMetadata
+
+  private isTwoPackageJsonProjectLayoutUsed = true
+
+  constructor(private options: Options = {}) {
+    setDefaultOptionValues(options)
+
+    this.appDir = this.computeAppDirectory()
+    this.appPackageFile = path.join(this.appDir, "package.json")
+    this.metadata = readPackageJson(this.appPackageFile)
+    this.checkMetadata()
+
+    this.distDir = path.join(process.cwd(), "dist")
+    this.outDir = this.computeOutDirectory()
+
+    console.log("Removing %s", this.outDir)
+    require("rimraf").sync(this.outDir)
+
+    const tasks: Array<((callback: (error: any, result: any) => void) => void)> = []
+    const cleanupTasks: Array<((callback: (error: any, result: any) => void) => void)> = []
+
+    const isMac = this.isMac
+    let keychainTaskAdded = false
+    let codeSigningInfo: CodeSigningInfo = null
+    const archs = isMac ? ["x64"] : (options.arch == null || options.arch === "all" ? ["ia32", "x64"] : [options.arch])
+    for (let arch of archs) {
+      const distPath = path.join(this.outDir, this.metadata.name + (isMac ? ".app" : "-win32-" + arch))
+      if (process.env.CSC_LINK != null && process.env.CSC_KEY_PASSWORD != null) {
+        // set macCscName to null - we sign app ourselves
+        const packTask = this.pack.bind(this, arch, null)
+        if (keychainTaskAdded) {
+          tasks.push(packTask)
+        }
+        else {
+          keychainTaskAdded = true
+          tasks.push(parallelTask(packTask, (callback) => {
+            createKeychain(handler(callback, (result: CodeSigningInfo) => { codeSigningInfo = result }))
+          }))
+          cleanupTasks.push(deleteKeychain)
+        }
+
+        addTasks(tasks, (callback) => {
+          console.log("Signing app")
+          execFile("codesign", ["--deep", "--force", "--sign", codeSigningInfo.cscName, distPath, "--keychain", codeSigningInfo.cscKeychainName], callback)
+        })
       }
       else {
-        console.error(error.message)
+        tasks.push(this.pack.bind(this, arch, this.options.sign || process.env.CSC_NAME))
       }
 
-      process.exit(1)
+      if (options.dist) {
+        const distTask = this.packageInDistributableFormat.bind(this, arch, distPath)
+        if (isMac) {
+          tasks.push(parallelTask(distTask, this.zipMacApp.bind(this)))
+        }
+        else {
+          tasks.push(distTask)
+        }
+        tasks.push(this.adjustDistLayout.bind(this, arch))
+      }
     }
-  })
-})
 
-function zipMacApp(callback: (error?: any, result?: any) => void) {
-  console.log("Zipping app")
-  const appName = appPackageJson.name
-  // -y param is important - "store symbolic links as the link instead of the referenced file"
-  spawn("zip", ["-ryXq", `${outDir}/${appName}-${version}-mac.zip`, appName + ".app"], {
-    cwd: outDir,
-    stdio: "inherit",
-  })
-    .on("close", (exitCode: number) => {
-      console.log("Finished zipping app")
-      callback(exitCode === 0 ? null : "Failed, exit code " + exitCode)
+    series(tasks, (error: any) => {
+      parallel(cleanupTasks, (cleanupError: any) => {
+        if (error == null) {
+          error = cleanupError
+        }
+
+        if (error != null) {
+          if (typeof error === "string") {
+            console.error(error)
+          }
+          else if (error.message == null) {
+            console.error(error, error.stack)
+          }
+          else {
+            console.error(error.message)
+          }
+
+          process.exit(1)
+        }
+      })
     })
-}
-
-function adjustDistLayout(arch: string, callback: (error?: any, result?: any) => void) {
-  const appName = appPackageJson.name
-  if (args.platform === "darwin") {
-    fs.rename(path.join(outDir, appName + ".dmg"), path.join(outDir, appName + "-" + version + ".dmg"), callback)
-  }
-  else {
-    fs.rename(path.join(outDir, arch, appName + "Setup.exe"), path.join(outDir, appName + "Setup-" + version + ((arch === "x64") ? "-x64" : "") + ".exe"), callback)
-  }
-}
-
-function pack(arch: string, callback: (error: any, result: any) => void) {
-  if (isTwoPackageJsonProjectLayoutUsed) {
-    installDependencies(arch)
-  }
-  else {
-    console.log("Skipping app dependencies installation because dev and app dependencies are not separated")
   }
 
-  packager(merge({
-    dir: appDir,
-    out: args.platform === "win32" ? path.join(distDir, "win") : distDir,
-    name: appPackageJson.name,
-    platform: args.platform,
-    arch: arch,
-    version: packageJson.devDependencies["electron-prebuilt"].substring(1),
-    icon: path.join(process.cwd(), "build", "icon"),
-    asar: true,
-    "app-version": version,
-    "build-version": version,
-    sign: args.sign || process.env.CSC_NAME,
-    "version-string": {
-      CompanyName: appPackageJson.authors,
-      FileDescription: appPackageJson.description,
-      FileVersion: version,
-      ProductVersion: version,
-      ProductName: appPackageJson.name,
-      InternalName: appPackageJson.name,
+  private get isMac(): boolean {
+    return this.options.platform === "darwin"
+  }
+
+  // Auto-detect app/ (two package.json project layout (development and app)) or fallback to use working directory if not explicitly specified
+  private computeAppDirectory(): string {
+    let customAppPath = this.options.appDir
+    let required = true
+    if (customAppPath == null) {
+      customAppPath = DEFAULT_APP_DIR_NAME
+      required = false
     }
-  }, appPackageJson.build || {}), callback)
-}
 
-function build(arch: string, distPath: string, callback: (error: any, result: any) => void) {
-  if (args.platform === "darwin") {
-    require("electron-builder").init().build(merge({
-      "appPath": distPath,
-      "platform": args.platform === "darwin" ? "osx" : (args.platform == "win32" ? "win" : args.platform),
-      "out": outDir,
-      "config": path.join(process.cwd(), "build", "packager.json"),
-    }, appPackageJson.darwinPackager || {}), callback)
-  }
-  else {
-    require('electron-installer-squirrel-windows')(merge({
-      name: appPackageJson.name,
-      path: distPath,
-      product_name: appPackageJson.name,
-      out: path.join(outDir, arch),
-      version: version,
-      description: appPackageJson.description,
-      authors: appPackageJson.author,
-      setup_icon: path.join(process.cwd(), "build", "icon.ico"),
-    }, appPackageJson.windowsPackager || {}), callback)
-  }
-}
-
-// Auto-detect app/ (two package.json project layout (development and app)) or fallback to use working directory if not explicitly specified
-function computeAppDirectory() {
-  let customAppPath = args.appDir
-  let required = true
-  if (customAppPath == null) {
-    customAppPath = DEFAULT_APP_DIR_NAME
-    required = false
+    let absoluteAppPath = path.join(process.cwd(), customAppPath)
+    try {
+      fs.accessSync(absoluteAppPath)
+    }
+    catch (e) {
+      if (required) {
+        throw new Error(customAppPath + " doesn't exists, " + e.message)
+      }
+      else {
+        this.isTwoPackageJsonProjectLayoutUsed = false
+        return process.cwd()
+      }
+    }
+    return absoluteAppPath
   }
 
-  let absoluteAppPath = path.normalize(path.join(process.cwd(), customAppPath))
-  try {
-    fs.accessSync(absoluteAppPath)
-  }
-  catch (e) {
-    if (required) {
-      throw new Error(customAppPath + " doesn't exists, " + e.message)
+  private computeOutDirectory() {
+    let relativeDirectory: string
+    if (this.isMac) {
+      relativeDirectory = this.metadata.name + "-darwin-x64"
     }
     else {
-      isTwoPackageJsonProjectLayoutUsed = false
-      return process.cwd()
+      relativeDirectory = "win"
+    }
+    return path.join(this.distDir, relativeDirectory)
+  }
+
+  private checkMetadata(): void {
+    const reportError = (missedFieldName: string) => {
+      throw new Error("Please specify '" + missedFieldName + "' in the application package.json ('" + this.appPackageFile + "')")
+    }
+
+    const metadata = this.metadata
+    if (metadata.name == null) {
+      reportError("name")
+    }
+    else if (metadata.description == null) {
+      reportError("description")
+    }
+    else if (metadata.version == null) {
+      reportError("version")
+    }
+    else if (metadata.build == null) {
+      throw new Error("Please specify 'build' configuration in the application package.json ('" + this.appPackageFile + "'), at least\n\n" +
+        '\t"build": {\n' +
+        '\t  "app-bundle-id": "your.id",\n' +
+        '\t  "app-category-type": "your.app.category.type"\n'
+        + '\t}' + "\n\n is required.\n")
+    }
+    else if (metadata.author == null) {
+      reportError("author")
     }
   }
-  return absoluteAppPath
-}
 
-function computeOutDirectory() {
-  let relativeDirectory: string
-  if (args.platform === "darwin") {
-    relativeDirectory = appPackageJson.name + "-darwin-x64"
-  }
-  else {
-    relativeDirectory = "win"
-  }
-  return path.join(distDir, relativeDirectory)
-}
+  private pack(arch: string, macCscName: string, callback: (error: any, result: any) => void) {
+    if (this.isTwoPackageJsonProjectLayoutUsed) {
+      installDependencies(arch)
+    }
+    else {
+      console.log("Skipping app dependencies installation because dev and app dependencies are not separated")
+    }
 
-function checkMetadata() {
-  function error(missedFieldName: string) {
-    throw new Error("Please specify '" + missedFieldName + "' in the application package.json ('" + appPackageJsonFile + "')")
+    packager(merge({
+      dir: this.appDir,
+      out: this.options.platform === "win32" ? path.join(this.distDir, "win") : this.distDir,
+      name: this.metadata.name,
+      platform: this.options.platform,
+      arch: arch,
+      version: packageJson.devDependencies["electron-prebuilt"].substring(1),
+      icon: path.join(process.cwd(), "build", "icon"),
+      asar: true,
+      "app-version": this.metadata.version,
+      "build-version": this.metadata,
+      sign: macCscName,
+      "version-string": {
+        CompanyName: this.metadata.author,
+        FileDescription: this.metadata.description,
+        FileVersion: this.metadata.version,
+        ProductVersion: this.metadata.version,
+        ProductName: this.metadata.name,
+        InternalName: this.metadata.name,
+      }
+    }, this.metadata.build), callback)
   }
 
-  if (appPackageJson.name == null) {
-    error("name")
+  private zipMacApp(callback: (error?: any, result?: any) => void) {
+    console.log("Zipping app")
+    const appName = this.metadata.name
+    // -y param is important - "store symbolic links as the link instead of the referenced file"
+    spawn("zip", ["-ryXq", `${this.outDir}/${appName}-${this.metadata.version}-mac.zip`, appName + ".app"], {
+      cwd: this.outDir,
+      stdio: "inherit",
+    })
+      .on("close", (exitCode: number) => {
+        console.log("Finished zipping app")
+        callback(exitCode === 0 ? null : "Failed, exit code " + exitCode)
+      })
   }
-  else if (appPackageJson.description == null) {
-    error("description")
+
+
+  private packageInDistributableFormat(arch: string, distPath: string, callback: (error: any, result: any) => void) {
+    if (this.options.platform == "win32") {
+      require('electron-installer-squirrel-windows')(merge({
+        name: this.metadata.name,
+        path: distPath,
+        product_name: this.metadata.name,
+        out: path.join(this.outDir, arch),
+        version: this.metadata.version,
+        description: this.metadata.description,
+        authors: this.metadata.author,
+        setup_icon: path.join(process.cwd(), "build", "icon.ico"),
+      }, this.metadata.windowsPackager || {}), callback)
+    }
+    else {
+      require("electron-builder").init().build(merge({
+        "appPath": distPath,
+        "platform": this.isMac ? "osx" : this.options.platform,
+        "out": this.outDir,
+        "config": path.join(process.cwd(), "build", "packager.json"),
+      }, this.metadata.darwinPackager || {}), callback)
+    }
   }
-  else if (appPackageJson.version == null) {
-    error("version")
-  }
-  else if (appPackageJson.build == null) {
-    throw new Error("Please specify 'build' configuration in the application package.json ('" + appPackageJsonFile + "'), at least\n\n" +
-      '\t"build": {\n' +
-      '\t  "app-bundle-id": "your.id",\n' +
-      '\t  "app-category-type": "your.app.category.type"\n'
-      + '\t}' + "\n\n is required.\n")
-  }
-  else if (appPackageJson.author == null) {
-    error("author")
+
+  private adjustDistLayout(arch: string, callback: (error?: any, result?: any) => void) {
+    const appName = this.metadata.name
+    if (this.options.platform === "darwin") {
+      fs.rename(path.join(this.outDir, appName + ".dmg"), path.join(this.outDir, appName + "-" + this.metadata.version + ".dmg"), callback)
+    }
+    else {
+      fs.rename(path.join(this.outDir, arch, appName + "Setup.exe"), path.join(this.outDir, appName + "Setup-" + this.metadata.version + ((arch === "x64") ? "-x64" : "") + ".exe"), callback)
+    }
   }
 }
