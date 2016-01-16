@@ -1,13 +1,10 @@
 os:
   - osx
 
-language: node_js
-node_js:
-  - '4'
-  - '5'
+language: cpp
 
 cache:
-  - directories:
+  directories:
     - node_modules
     - test/testApp/node_modules
     - $HOME/.electron
@@ -17,3 +14,10 @@ install:
 - npm prune
 - npm install
 - npm run compile
+- rm -rf ~/.nvm
+- git clone https://github.com/creationix/nvm.git ~/.nvm
+- source ~/.nvm/nvm.sh
+- nvm install 5
+
+script:
+- npm run test
