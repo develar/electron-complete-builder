@@ -5,11 +5,11 @@ node_js:
 
 cache:
   - apt
-  directories:
-  - node_modules
-  - test/testApp/node_modules
-  - $HOME/.electron
-  - $HOME/.npm
+  - directories:
+    - node_modules
+    - test/testApp/node_modules
+    - $HOME/.electron
+    - $HOME/.npm
 
 install:
 - npm prune
