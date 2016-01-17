@@ -1,6 +1,6 @@
 #! /usr/bin/env node
 
-import { Options, Packager, setDefaultOptionValues } from "./build"
+import { Options, Packager, setDefaultOptionValues } from "./Packager"
 import { commonArgs } from "./util"
 
 interface CliOptions extends Options {
