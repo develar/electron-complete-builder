@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "target": "es5",
+    "target": "es6",
     "noImplicitAny": true,
     "removeComments": true,
     "outDir": "out",
@@ -16,10 +16,12 @@
     "typings/**/*.d.ts"
   ],
   "files": [
+    "typings/gh-got.d.ts",
     "typings/node/node.d.ts",
     "typings/run.d.ts",
     "src/build-cli.ts",
     "src/codeSign.ts",
+    "src/githubPublisher.ts",
     "src/httpRequest.ts",
     "src/install-app-deps.ts",
     "src/Packager.ts",

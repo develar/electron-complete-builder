@@ -10,6 +10,7 @@
       <w>pkcs</w>
       <w>postinstall</w>
       <w>rimraf</w>
+      <w>tsconfig</w>
     </words>
   </dictionary>
 </component>

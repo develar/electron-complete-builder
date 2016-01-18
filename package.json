@@ -1,5 +1,6 @@
 {
   "name": "electron-complete-builder",
+  "description": "Complete solution to build ready for distribution and 'auto update' installers of your Electron App",
   "version": "0.4.0",
   "license": "MIT",
   "bin": {
@@ -7,7 +8,7 @@
     "build": "./out/build-cli.js"
   },
   "scripts": {
-    "compile": "rimraf out && tsconfig -i 2 && tsc",
+    "compile": "rimraf out && tsconfig -i 2 && ts-babel",
     "test": "mocha",
     "preversion": "npm prune && npm run compile && npm test"
   },
@@ -16,15 +17,18 @@
     "electron-builder": "^2.6.0",
     "electron-installer-squirrel-windows": "^1.2.2",
     "electron-packager": "^5.2.0",
+    "gh-got": "^2.4.0",
     "merge": "^1.2.0",
     "run-parallel": "^1.1.4",
     "run-series": "^1.1.4"
   },
   "devDependencies": {
+    "babel-plugin-transform-es2015-parameters": "^6.4.2",
     "mocha": "^2.3.4",
     "plist": "^1.2.0",
     "rimraf": "^2.5.0",
     "should": "^8.1.1",
+    "ts-babel": "^0.1.0",
     "tsconfig-glob": "^0.4.0",
     "typescript": "^1.8.0-dev.20160113"
   },
@@ -34,6 +38,11 @@
   },
   "engines": {
     "node": ">=0.4.0"
+  },
+  "babel": {
+    "plugins": [
+      "transform-es2015-parameters"
+    ]
   },
   "keywords": [
     "electron",
