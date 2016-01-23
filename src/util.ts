@@ -1,12 +1,10 @@
-"use strict"
+import * as fs from "fs"
+import { execFile } from "child_process"
+import "source-map-support/register"
+import Promise = require("bluebird")
+import rimraf = require("rimraf")
 
-const fs = require("fs")
-const path = require("path")
-const series = require("run-series")
-const parallel = require("run-parallel")
-const merge = require("merge")
-
-export const packageJson = readPackageJson(path.join(process.cwd(), "package.json"))
+export const log = console.log
 
 export const DEFAULT_APP_DIR_NAME = "app"
 
@@ -18,43 +16,25 @@ export const commonArgs: any[] = [
   }
 ]
 
-export function reportResult(result: any) {
-  if (result.status != 0) {
-    if (result.error != null) {
-      console.error(result.error)
-    }
-    process.exit(result.status)
-  }
-}
-
-export function readPackageJson(path: string) {
+export function parseJson(data: string, path: string): any {
   try {
-    return JSON.parse(fs.readFileSync(path))
+    return JSON.parse(data)
   }
   catch (e) {
     if (e instanceof SyntaxError) {
-      console.error(path + " is not a valid JSON file")
+      throw new Error("Cannot parse '" + path + "': " + e.message)
     }
-    throw e
+    else {
+      throw e
+    }
   }
 }
 
-export function installDependencies(arch: string, appDir?: string) {
-  if (appDir == null) {
-    appDir = DEFAULT_APP_DIR_NAME
-  }
-
-  const processWorkingDirectory = path.join(process.cwd(), appDir)
-  console.log("Installing production dependencies for arch " + (arch || process.arch) + " to " + processWorkingDirectory)
-
-  const electronPrebuiltDep = packageJson.devDependencies["electron-prebuilt"]
-  if (electronPrebuiltDep == null) {
-    throw new Error("Cannot find electron-prebuilt dependency to get electron version")
-  }
-
-  const env = merge(true, process.env, {
+export function installDependencies(appDir: string, arch: string, electronVersion: string): Promise<Buffer[]> {
+  log("Installing app dependencies for arch %s to %s", arch || process.arch, appDir)
+  const env = Object.assign({}, process.env, {
     npm_config_disturl: "https://atom.io/download/atom-shell",
-    npm_config_target: electronPrebuiltDep.substring(1),
+    npm_config_target: electronVersion,
     npm_config_runtime: "electron",
     HOME: require("os").homedir() + "/.electron-gyp",
   })
@@ -64,64 +44,84 @@ export function installDependencies(arch: string, appDir?: string) {
   }
 
   let npmExecPath = process.env.npm_execpath || process.env.NPM_CLI_JS
-  let npmExecArgs = ["install"]
+  const npmExecArgs = ["install"]
   if (npmExecPath == null) {
     npmExecPath = "npm"
   }
   else {
     npmExecArgs.unshift(npmExecPath)
-    npmExecPath = (process.env.npm_node_execpath || process.env.NODE_EXE || process.env.NODE_EXE || "node")
+    npmExecPath = process.env.npm_node_execpath || process.env.NODE_EXE || "node"
   }
-  reportResult(require("child_process").spawnSync(npmExecPath, npmExecArgs, {
-    cwd: processWorkingDirectory,
-    stdio: "inherit",
+
+  return exec(npmExecPath, npmExecArgs, {
+    cwd: appDir,
     env: env
-  }))
+  })
+    .catch(e => {
+      console.error(process.env)
+      throw e
+    })
 }
 
-export function handler<T>(callback: (error: Error|string) => void, handler: (result: T) => void) {
-  return function (error: Error|string, result: T): void {
-    if (error == null) {
-      try {
-        handler(result)
+interface ExecOptions {
+  cwd?: string
+  stdio?: any
+  customFds?: any
+  env?: any
+  encoding?: string
+  timeout?: number
+  maxBuffer?: number
+  killSignal?: string
+}
+
+export function exec(file: string, args?: string[], options?: ExecOptions): Promise<Buffer[]> {
+  return new Promise<Buffer[]>((resolve, reject) => {
+    execFile(file, args, options, (error, out, errorOut) => {
+      if (error == null) {
+        resolve([out, errorOut])
       }
-      catch (e) {
-        callback(e)
-        return
+      else {
+        reject(error)
       }
-      callback(null)
-    }
-    else {
-      callback(error)
-    }
-  }
+    })
+  })
 }
 
-export function parallelTask(...tasks: ((error?: any) => void)[]) {
-  return parallel.bind(null, tasks)
+const readFileAsync: ((filename: string, encoding?: string) => Promise<string | Buffer>) = Promise.promisify(fs.readFile)
+
+export function readFile(file: string): Promise<any> {
+  return readFileAsync(file, "utf8").
+    then((it: string) => parseJson(it, file))
 }
 
-export function seriesTask(...tasks: ((error?: any) => void)[]) {
-  return series.bind(null, tasks)
-}
-
-// typescript cannot infer function parameters type if use push directly
-function createTasks(...callbacks: ((error?: any) => void)[]) {
-  return callbacks
-}
-
-// typescript cannot infer function parameters type if use push directly
-export function addTasks(target: Array<((callback: (error: any, result: any) => void) => void)>, ...tasks: ((error?: any) => void)[]): void {
-  target.push.apply(target, tasks)
-}
-
-function task(dependencies: string[], task: (callback: (error?: any) => void) => void): Array<((callback: (error: any, result: any) => void) => void) | string> {
-  if (dependencies == null) {
-    return [task]
+export function getElectronVersion(packageData: any, filePath: string): string {
+  const devDependencies = packageData.devDependencies
+  let electronPrebuiltDep = devDependencies == null ? null : devDependencies["electron-prebuilt"]
+  if (electronPrebuiltDep == null) {
+    const dependencies = packageData.dependencies
+    electronPrebuiltDep = dependencies == null ? null : dependencies["electron-prebuilt"]
   }
 
-  const result = Array<any>(dependencies.length + 1)
-  result.push.apply(result, dependencies)
-  result.push(task)
-  return result
+  if (electronPrebuiltDep == null) {
+    throw new Error("Cannot find electron-prebuilt dependency to get electron version in the '" + filePath + "'")
+  }
+  return electronPrebuiltDep.substring(1)
+}
+
+export function deleteFile(path: string, ignoreIfNotExists: boolean = false): Promise<any> {
+  return new Promise<any>((resolve, reject) => {
+    fs.unlink(path, error => error == null ? resolve(null) : reject(error))
+  })
+}
+
+export function deleteDirectory(path: string) {
+  return new Promise<any>((resolve, reject) => {
+    rimraf(path, {glob: false}, error => error == null ? resolve(null) : reject(error))
+  })
+}
+
+export function renameFile(oldPath: string, newPath: string): Promise<any> {
+  return new Promise<any>((resolve, reject) => {
+    fs.rename(oldPath, newPath, error => error == null ? resolve(null) : reject(error))
+  })
 }

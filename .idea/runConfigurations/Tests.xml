@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Tests" type="mocha-javascript-test-runner" factoryName="Mocha">
-    <node-options />
+    <node-options>--harmony_rest_parameters --harmony_default_parameters</node-options>
     <working-directory>$PROJECT_DIR$</working-directory>
     <pass-parent-env>true</pass-parent-env>
     <envs />

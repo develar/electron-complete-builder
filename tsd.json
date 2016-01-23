@@ -5,7 +5,19 @@
   "path": "typings",
   "installed": {
     "node/node.d.ts": {
-      "commit": "1984ea435fe9e93a012d50db7773db58ae5d494b"
+      "commit": "0bc09e91dd6f2d34b14af4367a138d34f437a5d4"
+    },
+    "bluebird/bluebird.d.ts": {
+      "commit": "6035d7e34a7a64902f29cacd96abfb8af10f3da1"
+    },
+    "electron-packager/electron-packager.d.ts": {
+      "commit": "93bae1bb4c887c1375a4c1f0c3bb849ff06b8ac6"
+    },
+    "rimraf/rimraf.d.ts": {
+      "commit": "6035d7e34a7a64902f29cacd96abfb8af10f3da1"
+    },
+    "source-map-support/source-map-support.d.ts": {
+      "commit": "0bc09e91dd6f2d34b14af4367a138d34f437a5d4"
     }
   }
 }

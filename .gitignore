@@ -2,3 +2,6 @@ node_modules/
 out/
 npm-debug.log
 dist/
+.idea/compiler.xml
+.idea/encodings.xml
+.idea/copyright/profiles_settings.xml

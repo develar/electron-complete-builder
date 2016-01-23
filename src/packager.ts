@@ -2,21 +2,17 @@ import * as fs from "fs"
 import * as path from "path"
 import {
   DEFAULT_APP_DIR_NAME,
-  packageJson,
-  readPackageJson,
+  readFile,
   installDependencies,
-  parallelTask,
-  addTasks,
-  handler
+  renameFile,
+  log,
+  getElectronVersion,
+  deleteDirectory
 } from "./util"
-import { spawn, execFile } from "child_process"
-import { createKeychain, deleteKeychain, CodeSigningInfo } from "./codeSign"
-
-const merge = require("merge")
-
-const packager = require("electron-packager")
-const series = require("run-series")
-const parallel = require("run-parallel")
+import { spawn } from "child_process"
+import { createKeychain, deleteKeychain, CodeSigningInfo, generateKeychainName, sign } from "./codeSign"
+import { all, executeFinally, Promise, printErrorAndExit } from "./promise"
+import packager = require("electron-packager")
 
 export interface Options {
   arch?: string
@@ -26,6 +22,11 @@ export interface Options {
   sign?: string
   platform?: string
   appDir?: string
+
+  projectDir?: string
+
+  cscLink?: string
+  cscKeyPassword?: string
 }
 
 interface AppMetadata {
@@ -41,7 +42,6 @@ interface AppMetadata {
 }
 
 interface BuildMetadata {
-
 }
 
 export function setDefaultOptionValues(options: Options) {
@@ -53,9 +53,23 @@ export function setDefaultOptionValues(options: Options) {
   }
 }
 
+export function build(options: Options = {}) {
+  if (options.cscLink == null) {
+    options.cscLink = process.env.CSC_LINK
+  }
+  if (options.cscKeyPassword == null) {
+    options.cscKeyPassword = process.env.CSC_KEY_PASSWORD
+  }
+
+  new Packager(options)
+    .build()
+    .catch(printErrorAndExit)
+}
+
 export class Packager {
+  private projectDir: string
+
   private appDir: string
-  private appPackageFile: string
 
   private outDir: string
   private distDir: string
@@ -64,85 +78,86 @@ export class Packager {
 
   private isTwoPackageJsonProjectLayoutUsed = true
 
-  constructor(private options: Options = {}) {
-    setDefaultOptionValues(options)
+  private electronVersion: string
 
+  constructor(private options?: Options) {
+    setDefaultOptionValues(options || {})
+
+    this.projectDir = options.projectDir || process.cwd()
     this.appDir = this.computeAppDirectory()
-    this.appPackageFile = path.join(this.appDir, "package.json")
-    this.metadata = readPackageJson(this.appPackageFile)
-    this.checkMetadata()
+  }
 
-    this.distDir = path.join(process.cwd(), "dist")
-    this.outDir = this.computeOutDirectory()
+  async build(): Promise<any> {
+    const buildPackageFile = path.join(this.projectDir, "package.json")
+    const appPackageFile = this.projectDir === this.appDir ? buildPackageFile : path.join(this.appDir, "package.json")
+    await Promise.all(Array.from(new Set([buildPackageFile, appPackageFile]), readFile))
+      .then((result: any[]) => {
+        this.metadata = result[result.length - 1]
+        this.checkMetadata(appPackageFile)
 
-    console.log("Removing %s", this.outDir)
-    require("rimraf").sync(this.outDir)
+        this.electronVersion = getElectronVersion(result[0], buildPackageFile)
+        this.distDir = path.join(this.projectDir, "dist")
+        this.outDir = this.computeOutDirectory()
+      })
 
-    const tasks: Array<((callback: (error: any, result: any) => void) => void)> = []
-    const cleanupTasks: Array<((callback: (error: any, result: any) => void) => void)> = []
+    log("Removing %s", this.outDir)
+    await deleteDirectory(this.outDir)
 
+    const cleanupTasks: Array<() => Promise<any>> = []
+    return executeFinally(this.doBuild(cleanupTasks), error => all(cleanupTasks.map(it => it())))
+  }
+
+  private async doBuild(cleanupTasks: Array<() => Promise<any>>): Promise<any> {
     const isMac = this.isMac
-    let keychainTaskAdded = false
+    const archs = isMac ? ["x64"] : (this.options.arch == null || this.options.arch === "all" ? ["ia32", "x64"] : [this.options.arch])
     let codeSigningInfo: CodeSigningInfo = null
-    const archs = isMac ? ["x64"] : (options.arch == null || options.arch === "all" ? ["ia32", "x64"] : [options.arch])
+    let keychainName: string = null
     for (let arch of archs) {
+      await this.installAppDependencies(arch)
+
       const distPath = path.join(this.outDir, this.metadata.name + (isMac ? ".app" : "-win32-" + arch))
-      if (process.env.CSC_LINK != null && process.env.CSC_KEY_PASSWORD != null) {
-        // set macCscName to null - we sign app ourselves
-        const packTask = this.pack.bind(this, arch, null)
-        if (keychainTaskAdded) {
-          tasks.push(packTask)
+      if (isMac) {
+        if (keychainName == null && (this.options.cscLink != null && this.options.cscKeyPassword != null)) {
+          keychainName = generateKeychainName()
+          cleanupTasks.push(() => deleteKeychain(keychainName))
+          await Promise.all([
+            this.pack(arch),
+            createKeychain(keychainName, this.options.cscLink, this.options.cscKeyPassword)
+              .then(it => codeSigningInfo = it)
+          ])
         }
         else {
-          keychainTaskAdded = true
-          tasks.push(parallelTask(packTask, (callback) => {
-            createKeychain(handler(callback, (result: CodeSigningInfo) => { codeSigningInfo = result }))
-          }))
-          cleanupTasks.push(deleteKeychain)
+          await this.pack(arch)
         }
-
-        addTasks(tasks, (callback) => {
-          console.log("Signing app")
-          execFile("codesign", ["--deep", "--force", "--sign", codeSigningInfo.cscName, distPath, "--keychain", codeSigningInfo.cscKeychainName], callback)
-        })
+        await this.signMac(distPath, codeSigningInfo)
       }
       else {
-        tasks.push(this.pack.bind(this, arch, this.options.sign || process.env.CSC_NAME))
+        await this.pack(arch)
       }
 
-      if (options.dist) {
-        const distTask = this.packageInDistributableFormat.bind(this, arch, distPath)
-        if (isMac) {
-          tasks.push(parallelTask(distTask, this.zipMacApp.bind(this)))
-        }
-        else {
-          tasks.push(distTask)
-        }
-        tasks.push(this.adjustDistLayout.bind(this, arch))
+      if (this.options.dist) {
+        const distPromise = this.packageInDistributableFormat(arch, distPath)
+        await (isMac ? Promise.join(distPromise, this.zipMacApp()) : distPromise)
+        await this.adjustDistLayout(arch)
       }
     }
 
-    series(tasks, (error: any) => {
-      parallel(cleanupTasks, (cleanupError: any) => {
-        if (error == null) {
-          error = cleanupError
-        }
+    return null
+  }
 
-        if (error != null) {
-          if (typeof error === "string") {
-            console.error(error)
-          }
-          else if (error.message == null) {
-            console.error(error, error.stack)
-          }
-          else {
-            console.error(error.message)
-          }
+  private signMac(distPath: string, codeSigningInfo: CodeSigningInfo): Promise<any> {
+    if (codeSigningInfo == null) {
+      codeSigningInfo = {cscName: this.options.sign || process.env.CSC_NAME}
+    }
 
-          process.exit(1)
-        }
-      })
-    })
+    if (codeSigningInfo.cscName == null) {
+      log("App is not signed: CSC_LINK or CSC_NAME are not specified")
+      return Promise.resolve()
+    }
+    else {
+      log("Signing app")
+      return sign(distPath, codeSigningInfo)
+    }
   }
 
   private get isMac(): boolean {
@@ -158,7 +173,7 @@ export class Packager {
       required = false
     }
 
-    let absoluteAppPath = path.join(process.cwd(), customAppPath)
+    let absoluteAppPath = path.join(this.projectDir, customAppPath)
     try {
       fs.accessSync(absoluteAppPath)
     }
@@ -168,7 +183,7 @@ export class Packager {
       }
       else {
         this.isTwoPackageJsonProjectLayoutUsed = false
-        return process.cwd()
+        return this.projectDir
       }
     }
     return absoluteAppPath
@@ -185,9 +200,9 @@ export class Packager {
     return path.join(this.distDir, relativeDirectory)
   }
 
-  private checkMetadata(): void {
+  private checkMetadata(appPackageFile: string): void {
     const reportError = (missedFieldName: string) => {
-      throw new Error("Please specify '" + missedFieldName + "' in the application package.json ('" + this.appPackageFile + "')")
+      throw new Error("Please specify '" + missedFieldName + "' in the application package.json ('" + appPackageFile + "')")
     }
 
     const metadata = this.metadata
@@ -201,93 +216,107 @@ export class Packager {
       reportError("version")
     }
     else if (metadata.build == null) {
-      throw new Error("Please specify 'build' configuration in the application package.json ('" + this.appPackageFile + "'), at least\n\n" +
-        '\t"build": {\n' +
-        '\t  "app-bundle-id": "your.id",\n' +
-        '\t  "app-category-type": "your.app.category.type"\n'
-        + '\t}' + "\n\n is required.\n")
+      throw new Error("Please specify 'build' configuration in the application package.json ('" + appPackageFile + "'), at least\n\n" +
+          JSON.stringify({
+            build: {
+              "app-bundle-id": "your.id",
+              "app-category-type": "your.app.category.type"
+            }
+          }, null, "  ") + "\n\n is required.\n")
     }
     else if (metadata.author == null) {
       reportError("author")
     }
   }
 
-  private pack(arch: string, macCscName: string, callback: (error: any, result: any) => void) {
-    if (this.isTwoPackageJsonProjectLayoutUsed) {
-      installDependencies(arch)
-    }
-    else {
-      console.log("Skipping app dependencies installation because dev and app dependencies are not separated")
-    }
-
-    packager(merge({
-      dir: this.appDir,
-      out: this.options.platform === "win32" ? path.join(this.distDir, "win") : this.distDir,
-      name: this.metadata.name,
-      platform: this.options.platform,
-      arch: arch,
-      version: packageJson.devDependencies["electron-prebuilt"].substring(1),
-      icon: path.join(process.cwd(), "build", "icon"),
-      asar: true,
-      "app-version": this.metadata.version,
-      "build-version": this.metadata.version,
-      sign: macCscName,
-      "version-string": {
-        CompanyName: this.metadata.author,
-        FileDescription: this.metadata.description,
-        FileVersion: this.metadata.version,
-        ProductVersion: this.metadata.version,
-        ProductName: this.metadata.name,
-        InternalName: this.metadata.name,
-      }
-    }, this.metadata.build), callback)
-  }
-
-  private zipMacApp(callback: (error?: any, result?: any) => void) {
-    console.log("Zipping app")
-    const appName = this.metadata.name
-    // -y param is important - "store symbolic links as the link instead of the referenced file"
-    spawn("zip", ["-ryXq", `${this.outDir}/${appName}-${this.metadata.version}-mac.zip`, appName + ".app"], {
-      cwd: this.outDir,
-      stdio: "inherit",
-    })
-      .on("close", (exitCode: number) => {
-        console.log("Finished zipping app")
-        callback(exitCode === 0 ? null : "Failed, exit code " + exitCode)
-      })
-  }
-
-
-  private packageInDistributableFormat(arch: string, distPath: string, callback: (error: any, result: any) => void) {
-    if (this.options.platform == "win32") {
-      require('electron-installer-squirrel-windows')(merge({
+  private pack(arch: string) {
+    return new Promise((resolve, reject) => {
+      packager(Object.assign({
+        dir: this.appDir,
+        out: this.options.platform === "win32" ? path.join(this.distDir, "win") : this.distDir,
         name: this.metadata.name,
-        path: distPath,
-        product_name: this.metadata.name,
-        out: path.join(this.outDir, arch),
-        version: this.metadata.version,
-        description: this.metadata.description,
-        authors: this.metadata.author,
-        setup_icon: path.join(process.cwd(), "build", "icon.ico"),
-      }, this.metadata.windowsPackager || {}), callback)
+        platform: this.options.platform,
+        arch: arch,
+        version: this.electronVersion,
+        icon: path.join(this.projectDir, "build", "icon"),
+        asar: true,
+        "app-version": this.metadata.version,
+        "build-version": this.metadata.version,
+        "version-string": {
+          CompanyName: this.metadata.author,
+          FileDescription: this.metadata.description,
+          FileVersion: this.metadata.version,
+          ProductVersion: this.metadata.version,
+          ProductName: this.metadata.name,
+          InternalName: this.metadata.name,
+        }
+      }, this.metadata.build), error => error == null ? resolve(null) : reject(error))
+    })
+  }
+
+  private installAppDependencies(arch: string): Promise<any> {
+    if (this.isTwoPackageJsonProjectLayoutUsed) {
+      return installDependencies(this.appDir, arch, this.electronVersion)
     }
     else {
-      require("electron-builder").init().build(merge({
-        "appPath": distPath,
-        "platform": this.isMac ? "osx" : this.options.platform,
-        "out": this.outDir,
-        "config": path.join(process.cwd(), "build", "packager.json"),
-      }, this.metadata.darwinPackager || {}), callback)
+      log("Skipping app dependencies installation because dev and app dependencies are not separated")
+      return Promise.resolve(null)
     }
   }
 
-  private adjustDistLayout(arch: string, callback: (error?: any, result?: any) => void) {
+  private zipMacApp(): Promise<any> {
+    log("Zipping app")
+    const appName = this.metadata.name
+    return new Promise<any>((resolve, reject) => {
+      // -y param is important - "store symbolic links as the link instead of the referenced file"
+      spawn("zip", ["-ryXq", `${this.outDir}/${appName}-${this.metadata.version}-mac.zip`, appName + ".app"], {
+        cwd: this.outDir,
+        stdio: "inherit",
+      })
+        .on("close", (exitCode: number) => {
+          log("Finished zipping app")
+          if (exitCode === 0) {
+            resolve(null)
+          }
+          else {
+            reject(new Error("Failed, exit code " + exitCode))
+          }
+        })
+    })
+  }
+
+  private packageInDistributableFormat(arch: string, distPath: string): Promise<any> {
+    return new Promise<any>((resolve, reject) => {
+      if (this.options.platform === "win32") {
+        require("electron-installer-squirrel-windows")(Object.assign({
+          name: this.metadata.name,
+          path: distPath,
+          product_name: this.metadata.name,
+          out: path.join(this.outDir, arch),
+          version: this.metadata.version,
+          description: this.metadata.description,
+          authors: this.metadata.author,
+          setup_icon: path.join(this.projectDir, "build", "icon.ico"),
+        }, this.metadata.windowsPackager || {}), (error: Error) => error == null ? resolve(null) : reject(error))
+      }
+      else {
+        require("electron-builder").init().build(Object.assign({
+          "appPath": distPath,
+          "platform": this.isMac ? "osx" : this.options.platform,
+          "out": this.outDir,
+          "config": path.join(this.projectDir, "build", "packager.json"),
+        }, this.metadata.darwinPackager || {}), (error: Error) => error == null ? resolve(null) : reject(error))
+      }
+    })
+  }
+
+  private adjustDistLayout(arch: string): Promise<any> {
     const appName = this.metadata.name
     if (this.options.platform === "darwin") {
-      fs.rename(path.join(this.outDir, appName + ".dmg"), path.join(this.outDir, appName + "-" + this.metadata.version + ".dmg"), callback)
+      return renameFile(path.join(this.outDir, appName + ".dmg"), path.join(this.outDir, appName + "-" + this.metadata.version + ".dmg"))
     }
     else {
-      fs.rename(path.join(this.outDir, arch, appName + "Setup.exe"), path.join(this.outDir, appName + "Setup-" + this.metadata.version + ((arch === "x64") ? "-x64" : "") + ".exe"), callback)
+      return renameFile(path.join(this.outDir, arch, appName + "Setup.exe"), path.join(this.outDir, appName + "Setup-" + this.metadata.version + ((arch === "x64") ? "-x64" : "") + ".exe"))
     }
   }
 }

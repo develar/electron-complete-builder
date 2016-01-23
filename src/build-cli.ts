@@ -1,7 +1,8 @@
 #! /usr/bin/env node
 
-import { Options, Packager, setDefaultOptionValues } from "./Packager"
+import { Options, build, setDefaultOptionValues } from "./packager"
 import { commonArgs } from "./util"
+import cla = require("command-line-args")
 
 interface CliOptions extends Options {
   build: boolean
@@ -11,7 +12,7 @@ interface CliOptions extends Options {
 const defaultOptionValues: Options = {}
 setDefaultOptionValues(defaultOptionValues)
 
-const cli = require("command-line-args")(commonArgs.concat(
+const cli = cla(commonArgs.concat(
   {name: "arch", type: String, defaultValue: defaultOptionValues.arch, description: "ia32, x64 or all (by default)."},
   {name: "dist", type: Boolean, alias: "d", defaultValue: false, description: "Whether to package in a distributable format (e.g. DMG, windows installer, NuGet package)."},
   {name: "build", type: Boolean, defaultValue: false, description: "Deprecated, use dist instead."},
@@ -29,5 +30,5 @@ else {
     args.dist = true
   }
 
-  new Packager(args)
+  build(args)
 }

@@ -9,33 +9,35 @@
   },
   "scripts": {
     "compile": "rimraf out && tsconfig -i 2 && ts-babel",
+    "lint": "tslint src/*",
+    "pretest": "npm run lint",
     "test": "mocha",
-    "preversion": "npm prune && npm run compile && npm test"
+    "preversion": "npm prune && npm run compile && npm run test"
   },
   "dependencies": {
+    "bluebird": "^3.1.1",
     "command-line-args": "^2.1.4",
     "electron-builder": "^2.6.0",
     "electron-installer-squirrel-windows": "^1.2.2",
-    "electron-packager": "^5.2.0",
-    "gh-got": "^2.4.0",
-    "merge": "^1.2.0",
-    "run-parallel": "^1.1.4",
-    "run-series": "^1.1.4"
+    "electron-packager": "^5.2.1",
+    "source-map-support": "^0.4.0"
   },
   "devDependencies": {
-    "babel-plugin-transform-es2015-parameters": "^6.4.2",
+    "babel-plugin-transform-es2015-parameters": "^6.4.5",
     "mocha": "^2.3.4",
     "plist": "^1.2.0",
-    "rimraf": "^2.5.0",
+    "rimraf": "^2.5.1",
     "should": "^8.1.1",
     "ts-babel": "^0.1.0",
     "tsconfig-glob": "^0.4.0",
-    "typescript": "^1.8.0-dev.20160113"
+    "tslint": "^3.3.0",
+    "typescript": "^1.8.0-dev.20160121"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/develar/electron-complete-builder.git"
   },
+  "bugs": "https://github.com/develar/electron-complete-builder/issues",
   "engines": {
     "node": ">=0.4.0"
   },

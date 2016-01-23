@@ -1,44 +1,49 @@
 import { Socket } from "net"
-import { IncomingMessage } from "http"
+import { IncomingMessage, ClientRequest } from "http"
 import * as https from "https"
 import { createWriteStream } from "fs"
 import { parse as parseUrl } from "url"
+import Promise = require("bluebird")
+
 const maxRedirects = 10
 
-export function download(url: string, destination: string, callback: (error: any) => void) {
-  let done = false
-  doDownload(url, destination, (error) => {
-    if (!done) {
-      done = true
-      callback(error)
-    }
-  }, 0)
+export const download = Promise.promisify(_download)
+
+function _download(url: string, destination: string, callback: (error: Error) => void): void {
+  doDownload(url, destination, 0, callback)
 }
 
-function doDownload(url: string, destination: string, callback: (error: any) => void, redirectCount: number) {
+export function addTimeOutHandler(request: ClientRequest, callback: (error: Error | string) => void) {
+  request.on("socket", function (socket: Socket) {
+    socket.setTimeout(60 * 1000, () => {
+      callback("Request timed out")
+      request.abort()
+    })
+  })
+}
+
+function doDownload(url: string, destination: string, redirectCount: number, callback: (error: Error) => void) {
   const parsedUrl = parseUrl(url)
   const request = https.request({
-    protocol: parsedUrl.protocol,
-    host: parsedUrl.host,
-    port: 443,
+    hostname: parsedUrl.hostname,
     path: parsedUrl.path,
     headers: {
       // user-agent must be specified, otherwise some host can return 401 unauthorised
-      "User-Agent": "NodeHttpRequest"
+      "User-Agent": "electron-complete-builder"
     }
   }, (response: IncomingMessage) => {
     if (response.statusCode >= 400) {
-      callback("Request error, status " + response.statusCode + ": " + response.statusMessage)
+      callback(new Error("Request error, status " + response.statusCode + ": " + response.statusMessage))
       return
     }
 
     const redirectUrl = response.headers.location
     if (redirectUrl != null) {
       if (redirectCount < maxRedirects) {
-        doDownload(redirectUrl, destination, callback, redirectCount++)
+        doDownload(redirectUrl, destination, redirectCount++, callback)
       }
       else {
-        callback("Too many redirects (> " + maxRedirects + ")")
+        callback(new Error("Too many redirects (> " + maxRedirects + ")"))
       }
       return
     }
@@ -54,17 +59,11 @@ function doDownload(url: string, destination: string, callback: (error: any) => 
 
     response.on("close", () => {
       if (!ended) {
-        callback("Request aborted")
+        callback(new Error("Request aborted"))
       }
     })
   })
-  request.on("socket", function (socket: Socket) {
-    socket.setTimeout(60 * 1000, () => {
-      callback("Request timed out")
-      request.abort()
-    })
-  })
-
+  addTimeOutHandler(request, callback)
   request.on("error", callback)
   request.end()
 }
