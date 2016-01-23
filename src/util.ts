@@ -57,10 +57,6 @@ export function installDependencies(appDir: string, arch: string, electronVersio
     cwd: appDir,
     env: env
   })
-    .catch(e => {
-      console.error(process.env)
-      throw e
-    })
 }
 
 interface ExecOptions {

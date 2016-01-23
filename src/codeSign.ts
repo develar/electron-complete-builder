@@ -26,7 +26,6 @@ export function createAutoDisposableKeychain(cscLink: string, cscKeyPassword: st
 }
 
 export function createKeychain(keychainName: string, cscLink: string, cscKeyPassword: string): Promise<CodeSigningInfo> {
-  console.log(tmpdir())
   const appleCertPath = path.join(tmpdir(), randomString() + ".cer")
   const developerCertPath = path.join(tmpdir(), randomString() + ".p12")
 

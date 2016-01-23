@@ -22,7 +22,6 @@
     "typings/gh-api.d.ts",
     "typings/node/node.d.ts",
     "typings/rimraf/rimraf.d.ts",
-    "typings/run.d.ts",
     "typings/source-map-support/source-map-support.d.ts",
     "src/build-cli.ts",
     "src/codeSign.ts",
