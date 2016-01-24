@@ -1,5 +1,5 @@
 import * as fs from "fs"
-import { execFile } from "child_process"
+import { execFile, spawn } from "child_process"
 import "source-map-support/register"
 import Promise = require("bluebird")
 import rimraf = require("rimraf")
@@ -30,7 +30,9 @@ export function parseJson(data: string, path: string): any {
   }
 }
 
-export function installDependencies(appDir: string, arch: string, electronVersion: string): Promise<Buffer[]> {
+const execFileAsync: (file: string, args?: string[], options?: ExecOptions) => Promise<Buffer[]> = (<any>Promise.promisify(execFile, {multiArgs: true}))
+
+export function installDependencies(appDir: string, arch: string, electronVersion: string): Promise<any> {
   log("Installing app dependencies for arch %s to %s", arch || process.arch, appDir)
   const env = Object.assign({}, process.env, {
     npm_config_disturl: "https://atom.io/download/atom-shell",
@@ -53,9 +55,13 @@ export function installDependencies(appDir: string, arch: string, electronVersio
     npmExecPath = process.env.npm_node_execpath || process.env.NODE_EXE || "node"
   }
 
-  return exec(npmExecPath, npmExecArgs, {
-    cwd: appDir,
-    env: env
+  return new Promise<any>((resolve, reject) => {
+    const p = spawn(npmExecPath, npmExecArgs, {
+      cwd: appDir,
+      stdio: "inherit",
+      env: env
+    })
+    p.on("close", (code: number) => code === 0 ? resolve() : reject(new Error(npmExecPath + " exited with code " + code)))
   })
 }
 
@@ -71,16 +77,7 @@ interface ExecOptions {
 }
 
 export function exec(file: string, args?: string[], options?: ExecOptions): Promise<Buffer[]> {
-  return new Promise<Buffer[]>((resolve, reject) => {
-    execFile(file, args, options, (error, out, errorOut) => {
-      if (error == null) {
-        resolve([out, errorOut])
-      }
-      else {
-        reject(error)
-      }
-    })
-  })
+  return execFileAsync(file, args, options)
 }
 
 const readFileAsync: ((filename: string, encoding?: string) => Promise<string | Buffer>) = Promise.promisify(fs.readFile)

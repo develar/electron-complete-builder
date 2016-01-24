@@ -19,7 +19,6 @@ export class GitHubPublisher {
     }
 
     this.tag = "v" + version
-
     this._releasePromise = this.init()
   }
 
@@ -43,6 +42,7 @@ export class GitHubPublisher {
     if (!data.draft) {
       throw new Error("Release must be a draft")
     }
+    return data
   }
 
   private async createRelease() {
