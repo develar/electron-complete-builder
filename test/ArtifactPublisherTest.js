@@ -13,6 +13,11 @@ function versionNumber() {
 describe("Artifacts Uploader", function () {
   it("GitHub unauthorized", function () {
     return new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), "incorrect token")
-      .releasePromise.should.rejectedWith(/^Unauthorized/)
+      .releasePromise
+      .catch(e => {
+        console.error(e.stack)
+        throw e
+      })
+      .should.rejectedWith(/^Unauthorized/)
   })
 })

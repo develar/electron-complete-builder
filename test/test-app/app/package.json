@@ -3,12 +3,10 @@
   "name": "TestApp",
   "version": "1.0.0",
   "description": "Test Application",
-  "scripts": {
-    "start": "electron ."
-  },
   "author": "Foo Bar",
-  "devDependencies": {
-    "electron-prebuilt": "^0.36.0"
+  "homepage": "https://github.com/atom/electron-quick-start#readme",
+  "dependencies": {
+    "nslog": "^3.0.0"
   },
   "build": {
     "app-bundle-id": "your.id",
