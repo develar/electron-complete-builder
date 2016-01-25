@@ -20,6 +20,8 @@
     "typings/command-line-args.d.ts",
     "typings/electron-packager/electron-packager.d.ts",
     "typings/gh-api.d.ts",
+    "typings/hosted-git-info.d.ts",
+    "typings/mime/mime.d.ts",
     "typings/node/node.d.ts",
     "typings/rimraf/rimraf.d.ts",
     "typings/source-map-support/source-map-support.d.ts",
@@ -30,6 +32,7 @@
     "src/install-app-deps.ts",
     "src/packager.ts",
     "src/promise.ts",
+    "src/promisifed-fs.ts",
     "src/util.ts"
   ]
 }

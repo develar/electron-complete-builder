@@ -15,6 +15,7 @@ setDefaultOptionValues(defaultOptionValues)
 const cli = cla(commonArgs.concat(
   {name: "arch", type: String, defaultValue: defaultOptionValues.arch, description: "ia32, x64 or all (by default)."},
   {name: "dist", type: Boolean, alias: "d", defaultValue: false, description: "Whether to package in a distributable format (e.g. DMG, windows installer, NuGet package)."},
+  {name: "publish", type: Boolean, alias: "d", defaultValue: false, description: "Whether to publish artifacts (to GitHub Releases)."},
   {name: "build", type: Boolean, defaultValue: false, description: "Deprecated, use dist instead."},
   {name: "sign", type: String},
   {name: "platform", type: String, defaultValue: defaultOptionValues.platform, description: "darwin or win32. Curent platform (" + process.platform + ") by default."},

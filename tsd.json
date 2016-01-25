@@ -18,6 +18,9 @@
     },
     "source-map-support/source-map-support.d.ts": {
       "commit": "0bc09e91dd6f2d34b14af4367a138d34f437a5d4"
+    },
+    "mime/mime.d.ts": {
+      "commit": "5e269cec94f666c298625948c5c5ff8224846e33"
     }
   }
 }

@@ -1,23 +1,19 @@
 import * as fs from "fs"
 import * as path from "path"
-import {
-  DEFAULT_APP_DIR_NAME,
-  readFile,
-  installDependencies,
-  renameFile,
-  log,
-  getElectronVersion,
-  deleteDirectory
-} from "./util"
-import { spawn } from "child_process"
+import { DEFAULT_APP_DIR_NAME, installDependencies, log, getElectronVersion, spawn } from "./util"
+import { renameFile, readFile, deleteDirectory } from "./promisifed-fs"
 import { createKeychain, deleteKeychain, CodeSigningInfo, generateKeychainName, sign } from "./codeSign"
 import { all, executeFinally, Promise, printErrorAndExit } from "./promise"
+import { Publisher, GitHubPublisher } from "./gitHubPublisher"
+import { fromUrl as parseRepositoryUrl } from "hosted-git-info"
 import packager = require("electron-packager")
 
 export interface Options {
   arch?: string
 
   dist?: boolean
+  publish?: boolean
+  githubToken?: string
 
   sign?: string
   platform?: string
@@ -29,7 +25,18 @@ export interface Options {
   cscKeyPassword?: string
 }
 
-interface AppMetadata {
+interface RepositoryInfo {
+  url: string
+}
+
+interface Metadata {
+  repository: string | RepositoryInfo
+}
+
+interface DevMetadata extends Metadata {
+}
+
+interface AppMetadata extends Metadata {
   version: string
   name: string
   description: string
@@ -61,6 +68,10 @@ export function build(options: Options = {}) {
     options.cscKeyPassword = process.env.CSC_KEY_PASSWORD
   }
 
+  if (options.githubToken == null) {
+    options.githubToken = process.env.GH_TOKEN || process.env.GH_TEST_TOKEN
+  }
+
   new Packager(options)
     .build()
     .catch(printErrorAndExit)
@@ -75,6 +86,7 @@ export class Packager {
   private distDir: string
 
   private metadata: AppMetadata
+  private devMetadata: DevMetadata
 
   private isTwoPackageJsonProjectLayoutUsed = true
 
@@ -87,15 +99,24 @@ export class Packager {
     this.appDir = this.computeAppDirectory()
   }
 
+  private get isMac(): boolean {
+    return this.options.platform === "darwin"
+  }
+
+  private get devPackageFile(): string {
+    return path.join(this.projectDir, "package.json")
+  }
+
   async build(): Promise<any> {
-    const buildPackageFile = path.join(this.projectDir, "package.json")
+    const buildPackageFile = this.devPackageFile
     const appPackageFile = this.projectDir === this.appDir ? buildPackageFile : path.join(this.appDir, "package.json")
     await Promise.all(Array.from(new Set([buildPackageFile, appPackageFile]), readFile))
       .then((result: any[]) => {
         this.metadata = result[result.length - 1]
+        this.devMetadata = result[0]
         this.checkMetadata(appPackageFile)
 
-        this.electronVersion = getElectronVersion(result[0], buildPackageFile)
+        this.electronVersion = getElectronVersion(this.devMetadata, buildPackageFile)
         this.distDir = path.join(this.projectDir, "dist")
         this.outDir = this.computeOutDirectory()
       })
@@ -107,11 +128,26 @@ export class Packager {
     return executeFinally(this.doBuild(cleanupTasks), error => all(cleanupTasks.map(it => it())))
   }
 
+  private createPublisher(): Publisher {
+    if (!this.options.publish) {
+      return null
+    }
+
+    const repo = this.devMetadata.repository || this.metadata.repository
+    if (repo == null) {
+      throw new Error("Please specify 'repository' in the dev package.json ('" + this.devPackageFile + "')")
+    }
+    const info = parseRepositoryUrl(typeof repo === "string" ? repo : repo.url)
+    return new GitHubPublisher(info.user, info.project, this.metadata.version, this.options.githubToken)
+  }
+
   private async doBuild(cleanupTasks: Array<() => Promise<any>>): Promise<any> {
     const isMac = this.isMac
     const archs = isMac ? ["x64"] : (this.options.arch == null || this.options.arch === "all" ? ["ia32", "x64"] : [this.options.arch])
     let codeSigningInfo: CodeSigningInfo = null
     let keychainName: string = null
+
+    let publisher: Publisher = null
     for (let arch of archs) {
       await this.installAppDependencies(arch)
 
@@ -136,9 +172,16 @@ export class Packager {
       }
 
       if (this.options.dist) {
+        if (publisher == null) {
+          publisher = this.createPublisher()
+        }
+
         const distPromise = this.packageInDistributableFormat(arch, distPath)
-        await (isMac ? Promise.join(distPromise, this.zipMacApp()) : distPromise)
-        await this.adjustDistLayout(arch)
+        await (isMac ? Promise.all([distPromise, this.zipMacApp()]) : distPromise)
+        let distArtifactPath = await this.adjustDistLayout(arch)
+        if (publisher != null) {
+          publisher.upload(distArtifactPath)
+        }
       }
     }
 
@@ -158,10 +201,6 @@ export class Packager {
       log("Signing app")
       return sign(distPath, codeSigningInfo)
     }
-  }
-
-  private get isMac(): boolean {
-    return this.options.platform === "darwin"
   }
 
   // Auto-detect app/ (two package.json project layout (development and app)) or fallback to use working directory if not explicitly specified
@@ -264,25 +303,16 @@ export class Packager {
     }
   }
 
-  private zipMacApp(): Promise<any> {
+  private zipMacApp(): Promise<string> {
     log("Zipping app")
     const appName = this.metadata.name
-    return new Promise<any>((resolve, reject) => {
-      // -y param is important - "store symbolic links as the link instead of the referenced file"
-      spawn("zip", ["-ryXq", `${this.outDir}/${appName}-${this.metadata.version}-mac.zip`, appName + ".app"], {
-        cwd: this.outDir,
-        stdio: "inherit",
-      })
-        .on("close", (exitCode: number) => {
-          log("Finished zipping app")
-          if (exitCode === 0) {
-            resolve(null)
-          }
-          else {
-            reject(new Error("Failed, exit code " + exitCode))
-          }
-        })
+    // -y param is important - "store symbolic links as the link instead of the referenced file"
+    const resultPath = `${appName}-${this.metadata.version}-mac.zip`
+    return spawn("zip", ["-ryXq", resultPath, appName + ".app"], {
+      cwd: this.outDir,
+      stdio: "inherit",
     })
+      .thenReturn(this.outDir + "/" + resultPath)
   }
 
   private packageInDistributableFormat(arch: string, distPath: string): Promise<any> {
@@ -310,7 +340,8 @@ export class Packager {
     })
   }
 
-  private adjustDistLayout(arch: string): Promise<any> {
+  // returns new absolute file path
+  private adjustDistLayout(arch: string): Promise<string> {
     const appName = this.metadata.name
     if (this.options.platform === "darwin") {
       return renameFile(path.join(this.outDir, appName + ".dmg"), path.join(this.outDir, appName + "-" + this.metadata.version + ".dmg"))

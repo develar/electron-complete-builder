@@ -32,6 +32,7 @@ In your application `package.json` custom `build` field must be specified:
 This object will be used as source of [electron-packager](https://www.npmjs.com/package/electron-packager) options. You can specify any other options here.
 
 Standard fields `name`, `description`, `version` and `author` are required in the application `package.json`.
+`repository` is required to publish artifacts to GitHub Releases.
 
 # Auto Update
 electron-complete-builder produces all required artifacts:

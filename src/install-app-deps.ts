@@ -1,6 +1,7 @@
 #! /usr/bin/env node
 
-import { DEFAULT_APP_DIR_NAME, installDependencies, commonArgs, parseJson, getElectronVersion } from "./util"
+import { DEFAULT_APP_DIR_NAME, installDependencies, commonArgs, getElectronVersion } from "./util"
+import { parseJson } from "./promisifed-fs"
 import { printErrorAndExit } from "./promise"
 import { readFileSync } from "fs"
 import * as path from "path"

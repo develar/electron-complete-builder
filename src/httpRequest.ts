@@ -24,11 +24,11 @@ export function addTimeOutHandler(request: ClientRequest, callback: (error: Erro
 
 function doDownload(url: string, destination: string, redirectCount: number, callback: (error: Error) => void) {
   const parsedUrl = parseUrl(url)
+  // user-agent must be specified, otherwise some host can return 401 unauthorised
   const request = https.request({
     hostname: parsedUrl.hostname,
     path: parsedUrl.path,
     headers: {
-      // user-agent must be specified, otherwise some host can return 401 unauthorised
       "User-Agent": "electron-complete-builder"
     }
   }, (response: IncomingMessage) => {

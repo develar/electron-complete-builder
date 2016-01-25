@@ -1,34 +1,16 @@
-import * as fs from "fs"
-import { execFile, spawn } from "child_process"
+import { execFile, spawn as _spawn } from "child_process"
 import "source-map-support/register"
 import Promise = require("bluebird")
-import rimraf = require("rimraf")
 
 export const log = console.log
 
 export const DEFAULT_APP_DIR_NAME = "app"
 
-export const commonArgs: any[] = [
-  {
-    name: "appDir",
-    type: String,
-    description: "Relative (to the working directory) path to the folder containing the application package.json. Working directory or app/ by default."
-  }
-]
-
-export function parseJson(data: string, path: string): any {
-  try {
-    return JSON.parse(data)
-  }
-  catch (e) {
-    if (e instanceof SyntaxError) {
-      throw new Error("Cannot parse '" + path + "': " + e.message)
-    }
-    else {
-      throw e
-    }
-  }
-}
+export const commonArgs: any[] = [{
+  name: "appDir",
+  type: String,
+  description: "Relative (to the working directory) path to the folder containing the application package.json. Working directory or app/ by default."
+}]
 
 const execFileAsync: (file: string, args?: string[], options?: ExecOptions) => Promise<Buffer[]> = (<any>Promise.promisify(execFile, {multiArgs: true}))
 
@@ -55,36 +37,41 @@ export function installDependencies(appDir: string, arch: string, electronVersio
     npmExecPath = process.env.npm_node_execpath || process.env.NODE_EXE || "node"
   }
 
-  return new Promise<any>((resolve, reject) => {
-    const p = spawn(npmExecPath, npmExecArgs, {
-      cwd: appDir,
-      stdio: "inherit",
-      env: env
-    })
-    p.on("close", (code: number) => code === 0 ? resolve() : reject(new Error(npmExecPath + " exited with code " + code)))
+  return spawn(npmExecPath, npmExecArgs, {
+    cwd: appDir,
+    stdio: "inherit",
+    env: env
   })
 }
 
-interface ExecOptions {
+interface BaseExecOptions {
   cwd?: string
-  stdio?: any
-  customFds?: any
   env?: any
+  stdio?: any
+}
+
+interface ExecOptions extends BaseExecOptions {
+  customFds?: any
   encoding?: string
   timeout?: number
   maxBuffer?: number
   killSignal?: string
 }
 
+interface SpawnOptions extends BaseExecOptions {
+  custom?: any
+  detached?: boolean
+}
+
 export function exec(file: string, args?: string[], options?: ExecOptions): Promise<Buffer[]> {
   return execFileAsync(file, args, options)
 }
 
-const readFileAsync: ((filename: string, encoding?: string) => Promise<string | Buffer>) = Promise.promisify(fs.readFile)
-
-export function readFile(file: string): Promise<any> {
-  return readFileAsync(file, "utf8").
-    then((it: string) => parseJson(it, file))
+export function spawn(command: string, args?: string[], options?: SpawnOptions): Promise<any> {
+  return new Promise<any>((resolve, reject) => {
+    const p = _spawn(command, args, options)
+    p.on("close", (code: number) => code === 0 ? resolve() : reject(new Error(command + " exited with code " + code)))
+  })
 }
 
 export function getElectronVersion(packageData: any, filePath: string): string {
@@ -99,22 +86,4 @@ export function getElectronVersion(packageData: any, filePath: string): string {
     throw new Error("Cannot find electron-prebuilt dependency to get electron version in the '" + filePath + "'")
   }
   return electronPrebuiltDep.substring(1)
-}
-
-export function deleteFile(path: string, ignoreIfNotExists: boolean = false): Promise<any> {
-  return new Promise<any>((resolve, reject) => {
-    fs.unlink(path, error => error == null ? resolve(null) : reject(error))
-  })
-}
-
-export function deleteDirectory(path: string) {
-  return new Promise<any>((resolve, reject) => {
-    rimraf(path, {glob: false}, error => error == null ? resolve(null) : reject(error))
-  })
-}
-
-export function renameFile(oldPath: string, newPath: string): Promise<any> {
-  return new Promise<any>((resolve, reject) => {
-    fs.rename(oldPath, newPath, error => error == null ? resolve(null) : reject(error))
-  })
 }

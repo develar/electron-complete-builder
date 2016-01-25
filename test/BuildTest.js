@@ -4,6 +4,7 @@ const fs = require('fs')
 const plist = require("plist")
 const Packager = require("../out/packager")
 const util = require("../out/util")
+const promisifedFs = require("../out/promisifed-fs")
 const codeSignData = require("./codeSignData")
 require("should")
 
@@ -36,7 +37,7 @@ describe("Build", function () {
   const testAppPath = path.join(process.cwd(), "test", "testApp")
 
   beforeEach(() => {
-    return util.deleteDirectory(path.join(testAppPath, "dist"))
+    return promisifedFs.deleteDirectory(path.join(testAppPath, "dist"))
   })
 
   it("pack two-package.json project", function () {

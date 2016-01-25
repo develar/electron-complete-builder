@@ -1,13 +1,21 @@
-import { GetReleaseResult } from "gh-release"
+import { GetReleaseResult, Release } from "gh-release"
 import * as https from "https"
 import { IncomingMessage } from "http"
 import { addTimeOutHandler } from "./httpRequest"
 import { log } from "./util"
 import { Promise } from "./promise"
+import { basename } from "path"
+import { parse as parseUrl } from "url"
+import * as mime from "mime"
+import { stat } from "./promisifed-fs"
 
-export class GitHubPublisher {
+export interface Publisher {
+  upload(path: string): Promise<any>
+}
+
+export class GitHubPublisher implements Publisher {
   private tag: string
-  private _releasePromise: Promise<any>
+  private _releasePromise: Promise<Release>
 
   public get releasePromise() {
     return this._releasePromise
@@ -45,9 +53,27 @@ export class GitHubPublisher {
     return data
   }
 
+  public async upload(path: string): Promise<any> {
+    const fileName = basename(path)
+    let release = await this.releasePromise
+    const parsedUrl = parseUrl(release.upload_url.substring(0, release.upload_url.indexOf("{")) + "?name=" + fileName)
+    const fileStat = await stat(path)
+    doGithubRequest<any>({
+        hostname: parsedUrl.hostname,
+        path: parsedUrl.path,
+        headers: {
+          Accept: "application/vnd.github.v3+json",
+          "User-Agent": "electron-complete-builder",
+          "Content-Type": mime.lookup(fileName),
+          "Content-Length": fileStat.size
+        }
+      }
+    )
+  }
+
   private async createRelease() {
     try {
-      return await githubRequest(`/repos/${this.owner}/${this.repo}/releases`, this.token, {
+      return await githubRequest<Release>(`/repos/${this.owner}/${this.repo}/releases`, this.token, {
         tag_name: this.tag,
         draft: true,
       })
@@ -85,7 +111,10 @@ function githubRequest<T>(path: string, token: string = null, data: { [name: str
     options.headers["Content-Type"] = "application/json"
     options.headers["Content-Length"] = encodedData.length
   }
+  return doGithubRequest<T>(options, encodedData)
+}
 
+function doGithubRequest<T>(options: any, encodedData?: Buffer): Promise<T> {
   return new Promise<T>(function (resolve: (value: any) => void, reject: (error: Error) => void) {
     const request = https.request(options, (response: IncomingMessage) => {
       try {

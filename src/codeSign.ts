@@ -1,4 +1,5 @@
-import { exec, deleteFile } from "./util"
+import { exec } from "./util"
+import { deleteFile } from "./promisifed-fs"
 import { download } from "./httpRequest"
 import { tmpdir } from "os"
 import * as path from "path"
