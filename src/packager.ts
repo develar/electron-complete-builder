@@ -3,10 +3,11 @@ import * as path from "path"
 import { DEFAULT_APP_DIR_NAME, installDependencies, log, getElectronVersion, spawn } from "./util"
 import { renameFile, readFile, deleteDirectory } from "./promisifed-fs"
 import { createKeychain, deleteKeychain, CodeSigningInfo, generateKeychainName, sign } from "./codeSign"
-import { all, executeFinally, Promise, printErrorAndExit } from "./promise"
+import { all, executeFinally, printErrorAndExit } from "./promise"
 import { Publisher, GitHubPublisher } from "./gitHubPublisher"
 import { fromUrl as parseRepositoryUrl } from "hosted-git-info"
 import packager = require("electron-packager")
+import Promise = require("bluebird")
 
 export interface Options {
   arch?: string
@@ -125,7 +126,10 @@ export class Packager {
     await deleteDirectory(this.outDir)
 
     const cleanupTasks: Array<() => Promise<any>> = []
-    return executeFinally(this.doBuild(cleanupTasks), error => all(cleanupTasks.map(it => it())))
+    const publishTasks: Array<Promise<any>> = []
+    return executeFinally(this.doBuild(cleanupTasks, publishTasks), error => all(cleanupTasks.map(it => it())))
+      .then(() => Promise.all(publishTasks))
+
   }
 
   private createPublisher(): Publisher {
@@ -141,7 +145,7 @@ export class Packager {
     return new GitHubPublisher(info.user, info.project, this.metadata.version, this.options.githubToken)
   }
 
-  private async doBuild(cleanupTasks: Array<() => Promise<any>>): Promise<any> {
+  private async doBuild(cleanupTasks: Array<() => Promise<any>>, publishTasks: Array<Promise<any>>): Promise<any> {
     const isMac = this.isMac
     const archs = isMac ? ["x64"] : (this.options.arch == null || this.options.arch === "all" ? ["ia32", "x64"] : [this.options.arch])
     let codeSigningInfo: CodeSigningInfo = null
@@ -180,7 +184,7 @@ export class Packager {
         await (isMac ? Promise.all([distPromise, this.zipMacApp()]) : distPromise)
         let distArtifactPath = await this.adjustDistLayout(arch)
         if (publisher != null) {
-          publisher.upload(distArtifactPath)
+          publishTasks.push(publisher.upload(distArtifactPath))
         }
       }
     }

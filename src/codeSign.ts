@@ -20,27 +20,23 @@ export function generateKeychainName(): string {
   return "csc-" + randomString() + ".keychain"
 }
 
-export function createAutoDisposableKeychain(cscLink: string, cscKeyPassword: string) {
-  const keychainName = generateKeychainName()
-  return createKeychain(keychainName, cscLink, cscKeyPassword)
-    .disposer((info: CodeSigningInfo, promise: any) => deleteKeychain(keychainName, false))
-}
-
 export function createKeychain(keychainName: string, cscLink: string, cscKeyPassword: string): Promise<CodeSigningInfo> {
   const appleCertPath = path.join(tmpdir(), randomString() + ".cer")
   const developerCertPath = path.join(tmpdir(), randomString() + ".p12")
 
-  return executeFinally(Promise.join(
-    download("https://developer.apple.com/certificationauthority/AppleWWDRCA.cer", appleCertPath),
-    download(cscLink, developerCertPath),
-    Promise.mapSeries([
-      ["create-keychain", "-p", "travis", keychainName],
-      ["unlock-keychain", "-p", "travis", keychainName],
-      ["set-keychain-settings", "-t", "3600", "-u", keychainName]
-    ], args => exec("security", args)))
+  const keychainPassword = randomString()
+  return executeFinally(Promise.all([
+      download("https://developer.apple.com/certificationauthority/AppleWWDRCA.cer", appleCertPath),
+      download(cscLink, developerCertPath),
+      Promise.mapSeries([
+        ["create-keychain", "-p", keychainPassword, keychainName],
+        ["unlock-keychain", "-p", keychainPassword, keychainName],
+        ["set-keychain-settings", "-t", "3600", "-u", keychainName]
+      ], it => exec("security", it))
+    ])
     .then(() => importCerts(keychainName, appleCertPath, developerCertPath, cscKeyPassword)),
     error => {
-      const tasks = [deleteFile(appleCertPath), deleteFile(developerCertPath)]
+      const tasks = [deleteFile(appleCertPath, true), deleteFile(developerCertPath, true)]
       if (error != null) {
         tasks.push(deleteKeychain(keychainName))
       }
@@ -81,12 +77,14 @@ export function sign(path: string, options: CodeSigningInfo): Promise<any> {
 
 export function deleteKeychain(keychainName: string, ignoreNotFound: boolean = true): Promise<any> {
   const result = exec("security", ["delete-keychain", keychainName])
-  if (!ignoreNotFound) {
-    result.catch(error => {
+  if (ignoreNotFound) {
+    return result.catch(error => {
       if (!error.message.includes("The specified keychain could not be found.")) {
         throw error
       }
     })
   }
-  return result
+  else {
+    return result
+  }
 }

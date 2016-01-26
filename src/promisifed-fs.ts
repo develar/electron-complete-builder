@@ -25,7 +25,7 @@ export function parseJson(data: string, path: string): any {
 
 export function deleteFile(path: string, ignoreIfNotExists: boolean = false): Promise<any> {
   return new Promise<any>((resolve, reject) => {
-    fs.unlink(path, error => error == null ? resolve(null) : reject(error))
+    fs.unlink(path, error => error == null || (ignoreIfNotExists && error.code === "ENOENT") ? resolve(null) : reject(error))
   })
 }
 

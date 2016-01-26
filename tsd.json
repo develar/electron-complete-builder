@@ -5,7 +5,7 @@
   "path": "typings",
   "installed": {
     "node/node.d.ts": {
-      "commit": "0bc09e91dd6f2d34b14af4367a138d34f437a5d4"
+      "commit": "46719185c564694c5583c4b7ad94dbb786ecad46"
     },
     "bluebird/bluebird.d.ts": {
       "commit": "6035d7e34a7a64902f29cacd96abfb8af10f3da1"
@@ -21,6 +21,12 @@
     },
     "mime/mime.d.ts": {
       "commit": "5e269cec94f666c298625948c5c5ff8224846e33"
+    },
+    "progress/progress.d.ts": {
+      "commit": "46719185c564694c5583c4b7ad94dbb786ecad46"
+    },
+    "progressjs/progress.d.ts": {
+      "commit": "46719185c564694c5583c4b7ad94dbb786ecad46"
     }
   }
 }

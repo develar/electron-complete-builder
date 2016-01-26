@@ -1,13 +1,14 @@
 import { GetReleaseResult, Release } from "gh-release"
-import * as https from "https"
-import { IncomingMessage } from "http"
-import { addTimeOutHandler } from "./httpRequest"
 import { log } from "./util"
-import { Promise } from "./promise"
 import { basename } from "path"
 import { parse as parseUrl } from "url"
 import * as mime from "mime"
 import { stat } from "./promisifed-fs"
+import { createReadStream } from "fs"
+import { gitHubRequest, HttpError, doGitHubRequest } from "./gitHubRequest"
+import progressStream = require("progress-stream")
+import ProgressBar = require("progress")
+import Promise = require("bluebird")
 
 export interface Publisher {
   upload(path: string): Promise<any>
@@ -30,10 +31,10 @@ export class GitHubPublisher implements Publisher {
     this._releasePromise = this.init()
   }
 
-  private async init() {
+  private async init(): Promise<GetReleaseResult> {
     let data: GetReleaseResult
     try {
-      data = await githubRequest<GetReleaseResult>(`/repos/${this.owner}/${this.repo}/releases/tags/${this.tag}`)
+      data = await gitHubRequest<GetReleaseResult>(`/repos/${this.owner}/${this.repo}/releases/tags/${this.tag}`)
     }
     catch (e) {
       if (e instanceof HttpError) {
@@ -58,7 +59,8 @@ export class GitHubPublisher implements Publisher {
     let release = await this.releasePromise
     const parsedUrl = parseUrl(release.upload_url.substring(0, release.upload_url.indexOf("{")) + "?name=" + fileName)
     const fileStat = await stat(path)
-    doGithubRequest<any>({
+    const progressBar = new ProgressBar(":bar", { total: fileStat.size })
+    doGitHubRequest<any>({
         hostname: parsedUrl.hostname,
         path: parsedUrl.path,
         headers: {
@@ -67,13 +69,21 @@ export class GitHubPublisher implements Publisher {
           "Content-Type": mime.lookup(fileName),
           "Content-Length": fileStat.size
         }
-      }
-    )
+      }, (request, reject) => {
+      const fileInputStream = createReadStream(path)
+      fileInputStream.on("error", reject)
+      fileInputStream
+        .pipe(progressStream({
+          length: fileStat.size,
+          time: 1000
+        }, progress => progressBar.tick(progress.delta)))
+        .pipe(request)
+    })
   }
 
   private async createRelease() {
     try {
-      return await githubRequest<Release>(`/repos/${this.owner}/${this.repo}/releases`, this.token, {
+      return await gitHubRequest<Release>(`/repos/${this.owner}/${this.repo}/releases`, this.token, {
         tag_name: this.tag,
         draft: true,
       })
@@ -88,87 +98,5 @@ export class GitHubPublisher implements Publisher {
       }
       throw e
     }
-  }
-}
-
-function githubRequest<T>(path: string, token: string = null, data: { [name: string]: any; } = null): Promise<T> {
-  const options: any = {
-    hostname: "api.github.com",
-    path: path,
-    headers: {
-      Accept: "application/vnd.github.v3+json",
-      "User-Agent": "electron-complete-builder",
-    }
-  }
-
-  if (token != null) {
-    options.headers.authorization = "token " + token
-  }
-
-  const encodedData = data == null ? null : new Buffer(JSON.stringify(data))
-  if (encodedData != null) {
-    options.method = "post"
-    options.headers["Content-Type"] = "application/json"
-    options.headers["Content-Length"] = encodedData.length
-  }
-  return doGithubRequest<T>(options, encodedData)
-}
-
-function doGithubRequest<T>(options: any, encodedData?: Buffer): Promise<T> {
-  return new Promise<T>(function (resolve: (value: any) => void, reject: (error: Error) => void) {
-    const request = https.request(options, (response: IncomingMessage) => {
-      try {
-        if (response.statusCode === 404) {
-          // error is clear, we don't need to read detailed error description
-          reject(new HttpError(response))
-          return
-        }
-
-        let data = ""
-        response.setEncoding("utf8")
-        response.on("data", (chunk: string) => {
-          data += chunk
-        })
-
-        response.on("end", () => {
-          try {
-            if (response.statusCode >= 400) {
-              if (response.headers["content-type"].includes("json")) {
-                reject(new HttpError(response, JSON.parse(data).message))
-              }
-              else {
-                reject(new HttpError(response))
-              }
-            }
-            else {
-              resolve(JSON.parse(data))
-            }
-          }
-          catch (e) {
-            reject(e)
-          }
-        })
-      }
-      catch (e) {
-        reject(e)
-      }
-    })
-    addTimeOutHandler(request, reject)
-    request.on("error", reject)
-    request.end(encodedData)
-  })
-}
-
-export class HttpError extends Error {
-  constructor(public response: IncomingMessage, public description: any = null) {
-    super(response.statusCode + " " + response.statusMessage)
-  }
-
-  toString() {
-    let result = this.message
-    if (this.description != null) {
-      result += "\n" + this.description
-    }
-    return result
   }
 }

@@ -50,7 +50,7 @@ function doDownload(url: string, destination: string, redirectCount: number, cal
 
     const downloadStream = createWriteStream(destination)
     response.pipe(downloadStream)
-    downloadStream.on("finish", () => { downloadStream.close(callback) })
+    downloadStream.on("finish", () => downloadStream.close(callback))
 
     let ended = false
     response.on("end", () => {

@@ -1,9 +1,8 @@
-import BluebirdPromise = require("bluebird")
+import Promise = require("bluebird")
 
-export const Promise: PromiseConstructor = BluebirdPromise
-
-BluebirdPromise.config({
+Promise.config({
   longStackTraces: true,
+  cancellation: true
 })
 
 export function printErrorAndExit(error: Error) {
@@ -11,6 +10,7 @@ export function printErrorAndExit(error: Error) {
   process.exit(-1)
 }
 
+// you don't need to handle error in your task - it is passed only indicate status of promise
 export async function executeFinally(promise: Promise<any>, task: (error?: Error) => Promise<any>): Promise<any> {
   let result: any = null
   try {
@@ -39,8 +39,10 @@ export async function executeFinally(promise: Promise<any>, task: (error?: Error
 export class NestedError extends Error {
   constructor(errors: Array<Error>, message: string = "Compound error: ") {
     let m = message
+    let i = 1
     for (let error of errors) {
-      m += "\n" + error.message
+      const prefix = "Error #" + i++ + " "
+      m += "\n\n" + prefix + "-".repeat(80) + "\n" + error.stack
     }
     super(m)
   }
