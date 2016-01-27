@@ -3,7 +3,7 @@ import * as path from "path"
 import { DEFAULT_APP_DIR_NAME, installDependencies, log, getElectronVersion, spawn } from "./util"
 import { renameFile, readFile, deleteDirectory } from "./promisifed-fs"
 import { createKeychain, deleteKeychain, CodeSigningInfo, generateKeychainName, sign } from "./codeSign"
-import { all, executeFinally, printErrorAndExit } from "./promise"
+import { all, executeFinally } from "./promise"
 import { Publisher, GitHubPublisher } from "./gitHubPublisher"
 import { fromUrl as parseRepositoryUrl } from "hosted-git-info"
 import packager = require("electron-packager")
@@ -59,23 +59,6 @@ export function setDefaultOptionValues(options: Options) {
   if (options.platform == null) {
     options.platform = process.platform
   }
-}
-
-export function build(options: Options = {}) {
-  if (options.cscLink == null) {
-    options.cscLink = process.env.CSC_LINK
-  }
-  if (options.cscKeyPassword == null) {
-    options.cscKeyPassword = process.env.CSC_KEY_PASSWORD
-  }
-
-  if (options.githubToken == null) {
-    options.githubToken = process.env.GH_TOKEN || process.env.GH_TEST_TOKEN
-  }
-
-  new Packager(options)
-    .build()
-    .catch(printErrorAndExit)
 }
 
 export class Packager {
@@ -354,4 +337,20 @@ export class Packager {
       return renameFile(path.join(this.outDir, arch, appName + "Setup.exe"), path.join(this.outDir, appName + "Setup-" + this.metadata.version + ((arch === "x64") ? "-x64" : "") + ".exe"))
     }
   }
+}
+
+export function build(options: Options = {}): Promise<any> {
+  if (options.cscLink == null) {
+    options.cscLink = process.env.CSC_LINK
+  }
+  if (options.cscKeyPassword == null) {
+    options.cscKeyPassword = process.env.CSC_KEY_PASSWORD
+  }
+
+  if (options.githubToken == null) {
+    options.githubToken = process.env.GH_TOKEN || process.env.GH_TEST_TOKEN
+  }
+
+  return new Packager(options)
+    .build()
 }

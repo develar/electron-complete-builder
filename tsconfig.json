@@ -16,7 +16,7 @@
     "typings/**/*.d.ts"
   ],
   "files": [
-    "typings/bluebird/bluebird.d.ts",
+    "typings/bluebird.d.ts",
     "typings/command-line-args.d.ts",
     "typings/electron-packager/electron-packager.d.ts",
     "typings/gh-api.d.ts",

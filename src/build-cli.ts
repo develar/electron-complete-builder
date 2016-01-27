@@ -2,6 +2,7 @@
 
 import { Options, build, setDefaultOptionValues } from "./packager"
 import { commonArgs } from "./util"
+import { printErrorAndExit } from "./promise"
 import cla = require("command-line-args")
 
 interface CliOptions extends Options {
@@ -32,4 +33,5 @@ else {
   }
 
   build(args)
+    .catch(printErrorAndExit)
 }

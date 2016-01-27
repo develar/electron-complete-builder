@@ -7,9 +7,6 @@
     "node/node.d.ts": {
       "commit": "46719185c564694c5583c4b7ad94dbb786ecad46"
     },
-    "bluebird/bluebird.d.ts": {
-      "commit": "6035d7e34a7a64902f29cacd96abfb8af10f3da1"
-    },
     "electron-packager/electron-packager.d.ts": {
       "commit": "93bae1bb4c887c1375a4c1f0c3bb849ff06b8ac6"
     },
