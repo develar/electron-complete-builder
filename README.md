@@ -5,41 +5,80 @@ Complete solution to build ready for distribution and "auto update" installers o
 * [Code Signing](#code-signing) on a CI server or development machine.
 
 [electron-packager](https://github.com/maxogden/electron-packager),
-[electron-builder](https://github.com/loopline-systems/electron-builder) and
+[appdmg](https://github.com/LinusU/node-appdmg) and
 [electron-installer-squirrel-windows](https://github.com/mongodb-js/electron-installer-squirrel-windows) are used under the hood.
 
 Real project example — [onshape-desktop-shell](https://github.com/develar/onshape-desktop-shell).
 
-Part of your development `package.json`:
-```json
-{
-  "scripts" : {
-    "postinstall": "install-app-deps",
-    "pack": "build",
-    "build": "build --dist"
-  }
-}
-```
+# Configuration
+## In short
+1. Ensure that required fields are specified in the application `package.json`:
 
-In your application `package.json` custom `build` field must be specified:
+  Standard `name`, `description`, `version` and `author`.
+  `repository` is required to publish artifacts to GitHub Releases.
+
+  Custom `build` field must be specified:
+  ```json
+  "build": {
+    "app-bundle-id": "your.id",
+    "app-category-type": "your.app.category.type"
+  }
+  ```
+  This object will be used as source of [electron-packager](https://www.npmjs.com/package/electron-packager) options. You can specify any other options here.
+
+
+2. Create directory `build` in the root of the project and put your `background.png` (OS X DMG background), `icon.icns` (OS X app icon) and `icon.ico` (Windows app icon).
+
+3. Add [scripts](https://docs.npmjs.com/cli/run-script) to the development `package.json`:
+    ```json
+    "scripts" : {
+      "postinstall": "install-app-deps",
+      "pack": "build",
+      "dist": "build --dist"
+    }
+    ```
+
+    And then you can run `npm run pack` or `npm run dist` (to package in a distributable format (e.g. DMG, windows installer, NuGet package)).
+
+## Distributable Format Configuration
+In the development `package.json` custom `build` field can be specified to customize distributable format:
 ```json
 "build": {
-  "app-bundle-id": "your.id",
-  "app-category-type": "your.app.category.type"
+  "osx": {
+    "title": "computed name from app package.js, you can overwrite",
+    "icon": "build/icon.icns",
+    "icon-size": 80,
+    "background": "build/background.png",
+    "contents": [
+      {
+        "x": 410,
+        "y": 220,
+        "type": "link",
+        "path": "/Applications"
+      },
+      {
+        "x": 130,
+        "y": 220,
+        "type": "file",
+        "path": "computed path to artifact, do not specify it - will be overwritten"
+      }
+    ]
+  },
+  "win": "see https://github.com/mongodb-js/electron-installer-squirrel-windows#opts"
 }
 ```
 
-This object will be used as source of [electron-packager](https://www.npmjs.com/package/electron-packager) options. You can specify any other options here.
+As you can see, you need to customize OS X options only if you want to provide custom `x, y`.
+Don't customize paths to background and icon, — just follow conventions (if you don't want to use `build` as directory of resources — please create issue to ask ability to customize it).
 
-Standard fields `name`, `description`, `version` and `author` are required in the application `package.json`.
-`repository` is required to publish artifacts to GitHub Releases.
+See [OS X options](https://www.npmjs.com/package/appdmg#json-specification) and [Windows options](https://github.com/mongodb-js/electron-installer-squirrel-windows#opts).
 
 # Auto Update
 electron-complete-builder produces all required artifacts:
 
 * `.dmg`: OS X installer, required for OS X user to initial install.
 * `-mac.zip`: required for Squirrel.Mac.
-* `.exe` and `-x64.exe`: Windows installer, required for Windows user to initial install. Please note — [your app must handle Squirrel.Windows events](https://github.com/mongodb-js/electron-installer-squirrel-windows#integration). See [real example](https://github.com/develar/onshape-desktop-shell/blob/master/src/WinSquirrelStartupEventHandler.ts). 
+* `.exe` and `-x64.exe`: Windows installer, required for Windows user to initial install. Please note — [your app must handle Squirrel.Windows events](https://github.com/mongodb-js/electron-installer-squirrel-windows#integration). See [real example](https://github.com/develar/onshape-desktop-shell/blob/master/src/WinSquirrelStartupEventHandler.ts).
 * `.full-nupkg`: required for Squirrel.Windows.
 
 You need to deploy somewhere [releases/downloads server](https://github.com/GitbookIO/nuts).

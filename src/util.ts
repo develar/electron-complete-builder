@@ -4,6 +4,11 @@ import Promise = require("bluebird")
 
 export const log = console.log
 
+Promise.config({
+  longStackTraces: true,
+  cancellation: true
+})
+
 export const DEFAULT_APP_DIR_NAME = "app"
 
 export const commonArgs: any[] = [{

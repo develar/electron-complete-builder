@@ -16,10 +16,10 @@
     "preversion": "npm prune && npm run compile && npm run test"
   },
   "dependencies": {
+    "appdmg": "^0.3.5",
     "bluebird": "^3.1.4",
     "command-line-args": "^2.1.4",
     "del": "^2.2.0",
-    "electron-builder": "^2.6.0",
     "electron-installer-squirrel-windows": "^1.2.2",
     "electron-packager": "^5.2.1",
     "hosted-git-info": "^2.1.4",
@@ -37,7 +37,7 @@
     "ts-babel": "^0.3.0",
     "tsconfig-glob": "^0.4.0",
     "tslint": "^3.3.0",
-    "typescript": "^1.8.0-dev.20160121"
+    "typescript": "next"
   },
   "repository": {
     "type": "git",

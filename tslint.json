@@ -2,10 +2,6 @@
   "rules": {
     "class-name": true,
     "curly": true,
-    "comment-format": [
-      true,
-      "check-space"
-    ],
     "indent": [
       true,
       "spaces"

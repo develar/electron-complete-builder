@@ -4,16 +4,15 @@ import { DEFAULT_APP_DIR_NAME, installDependencies, log, getElectronVersion, spa
 import { renameFile, readFile, deleteDirectory } from "./promisifed-fs"
 import { createKeychain, deleteKeychain, CodeSigningInfo, generateKeychainName, sign } from "./codeSign"
 import { all, executeFinally } from "./promise"
-import { Publisher, GitHubPublisher } from "./gitHubPublisher"
-import { fromUrl as parseRepositoryUrl } from "hosted-git-info"
+import { EventEmitter } from "events"
 import packager = require("electron-packager")
 import Promise = require("bluebird")
+import appDmg = require("appdmg")
 
-export interface Options {
+export interface PackagerOptions {
   arch?: string
 
   dist?: boolean
-  publish?: boolean
   githubToken?: string
 
   sign?: string
@@ -35,6 +34,11 @@ interface Metadata {
 }
 
 interface DevMetadata extends Metadata {
+  build: DevBuildMetadata
+}
+
+interface DevBuildMetadata {
+  osx: appdmg.Specification
 }
 
 interface AppMetadata extends Metadata {
@@ -46,13 +50,16 @@ interface AppMetadata extends Metadata {
   build: BuildMetadata
 
   windowsPackager: any
-  darwinPackager: any
 }
 
 interface BuildMetadata {
 }
 
-export function setDefaultOptionValues(options: Options) {
+function addHandler(emitter: EventEmitter, event: string, handler: Function) {
+  emitter.on(event, handler)
+}
+
+export function setDefaultOptionValues(options: PackagerOptions) {
   if (options.arch == null) {
     options.arch = "all"
   }
@@ -69,25 +76,36 @@ export class Packager {
   private outDir: string
   private distDir: string
 
-  private metadata: AppMetadata
-  private devMetadata: DevMetadata
+  public metadata: AppMetadata
+  public devMetadata: DevMetadata
 
   private isTwoPackageJsonProjectLayoutUsed = true
 
   private electronVersion: string
 
-  constructor(private options?: Options) {
+  private eventEmitter = new EventEmitter()
+
+  constructor(private options?: PackagerOptions) {
     setDefaultOptionValues(options || {})
 
-    this.projectDir = options.projectDir || process.cwd()
+    this.projectDir = options.projectDir == null ? process.cwd() : path.resolve(options.projectDir)
     this.appDir = this.computeAppDirectory()
+  }
+
+  artifactCreated(handler: (path: string) => void): Packager {
+    addHandler(this.eventEmitter, "artifactCreated", handler)
+    return this
+  }
+
+  private dispatchArtifactCreated(path: string) {
+    this.eventEmitter.emit("artifactCreated", path)
   }
 
   private get isMac(): boolean {
     return this.options.platform === "darwin"
   }
 
-  private get devPackageFile(): string {
+  public get devPackageFile(): string {
     return path.join(this.projectDir, "package.json")
   }
 
@@ -109,32 +127,15 @@ export class Packager {
     await deleteDirectory(this.outDir)
 
     const cleanupTasks: Array<() => Promise<any>> = []
-    const publishTasks: Array<Promise<any>> = []
-    return executeFinally(this.doBuild(cleanupTasks, publishTasks), error => all(cleanupTasks.map(it => it())))
-      .then(() => Promise.all(publishTasks))
-
+    return executeFinally(this.doBuild(cleanupTasks), error => all(cleanupTasks.map(it => it())))
   }
 
-  private createPublisher(): Publisher {
-    if (!this.options.publish) {
-      return null
-    }
-
-    const repo = this.devMetadata.repository || this.metadata.repository
-    if (repo == null) {
-      throw new Error("Please specify 'repository' in the dev package.json ('" + this.devPackageFile + "')")
-    }
-    const info = parseRepositoryUrl(typeof repo === "string" ? repo : repo.url)
-    return new GitHubPublisher(info.user, info.project, this.metadata.version, this.options.githubToken)
-  }
-
-  private async doBuild(cleanupTasks: Array<() => Promise<any>>, publishTasks: Array<Promise<any>>): Promise<any> {
+  private async doBuild(cleanupTasks: Array<() => Promise<any>>): Promise<any> {
     const isMac = this.isMac
     const archs = isMac ? ["x64"] : (this.options.arch == null || this.options.arch === "all" ? ["ia32", "x64"] : [this.options.arch])
     let codeSigningInfo: CodeSigningInfo = null
     let keychainName: string = null
 
-    let publisher: Publisher = null
     for (let arch of archs) {
       await this.installAppDependencies(arch)
 
@@ -159,16 +160,13 @@ export class Packager {
       }
 
       if (this.options.dist) {
-        if (publisher == null) {
-          publisher = this.createPublisher()
-        }
-
         const distPromise = this.packageInDistributableFormat(arch, distPath)
-        await (isMac ? Promise.all([distPromise, this.zipMacApp()]) : distPromise)
-        let distArtifactPath = await this.adjustDistLayout(arch)
-        if (publisher != null) {
-          publishTasks.push(publisher.upload(distArtifactPath))
-        }
+          .then(path => this.dispatchArtifactCreated(path))
+        await (isMac ? Promise.all([
+          distPromise,
+          this.zipMacApp()
+            .then(path => this.dispatchArtifactCreated(path))
+        ]) : distPromise)
       }
     }
 
@@ -291,7 +289,7 @@ export class Packager {
   }
 
   private zipMacApp(): Promise<string> {
-    log("Zipping app")
+    log("Creating ZIP for Squirrel.Mac")
     const appName = this.metadata.name
     // -y param is important - "store symbolic links as the link instead of the referenced file"
     const resultPath = `${appName}-${this.metadata.version}-mac.zip`
@@ -302,9 +300,11 @@ export class Packager {
       .thenReturn(this.outDir + "/" + resultPath)
   }
 
-  private packageInDistributableFormat(arch: string, distPath: string): Promise<any> {
-    return new Promise<any>((resolve, reject) => {
-      if (this.options.platform === "win32") {
+  // returns absolute artifact path
+  private packageInDistributableFormat(arch: string, distPath: string): Promise<string> {
+    const appName = this.metadata.name
+    if (this.options.platform === "win32") {
+      return new Promise<any>((resolve, reject) => {
         require("electron-installer-squirrel-windows")(Object.assign({
           name: this.metadata.name,
           path: distPath,
@@ -315,42 +315,48 @@ export class Packager {
           authors: this.metadata.author,
           setup_icon: path.join(this.projectDir, "build", "icon.ico"),
         }, this.metadata.windowsPackager || {}), (error: Error) => error == null ? resolve(null) : reject(error))
-      }
-      else {
-        require("electron-builder").init().build(Object.assign({
-          "appPath": distPath,
-          "platform": this.isMac ? "osx" : this.options.platform,
-          "out": this.outDir,
-          "config": path.join(this.projectDir, "build", "packager.json"),
-        }, this.metadata.darwinPackager || {}), (error: Error) => error == null ? resolve(null) : reject(error))
-      }
-    })
-  }
-
-  // returns new absolute file path
-  private adjustDistLayout(arch: string): Promise<string> {
-    const appName = this.metadata.name
-    if (this.options.platform === "darwin") {
-      return renameFile(path.join(this.outDir, appName + ".dmg"), path.join(this.outDir, appName + "-" + this.metadata.version + ".dmg"))
+      })
+        .then(() => renameFile(path.join(this.outDir, arch, appName + "Setup.exe"), path.join(this.outDir, appName + "Setup-" + this.metadata.version + ((arch === "x64") ? "-x64" : "") + ".exe")))
     }
     else {
-      return renameFile(path.join(this.outDir, arch, appName + "Setup.exe"), path.join(this.outDir, appName + "Setup-" + this.metadata.version + ((arch === "x64") ? "-x64" : "") + ".exe"))
+      return new Promise<any>((resolve, reject) => {
+        log("Creating DMG")
+        const artifactPath = path.join(this.outDir, this.metadata.name + "-" + this.metadata.version + ".dmg")
+
+        const specification: appdmg.Specification = {
+          title: this.metadata.name,
+          icon: "build/icon.icns",
+          "icon-size": 80,
+          background: "build/background.png",
+          contents: [
+            {
+              "x": 410, "y": 220, "type": "link", "path": "/Applications"
+            },
+            {
+              "x": 130, "y": 220, "type": "file"
+            }
+          ]
+        }
+
+        const buildMetadata = this.devMetadata.build
+        if (buildMetadata != null && buildMetadata.osx != null) {
+          Object.assign(specification, buildMetadata.osx)
+        }
+
+        if (specification.title == null) {
+          specification.title = this.metadata.name
+        }
+
+        specification.contents[1].path = distPath
+
+        const emitter = appDmg({
+          target: artifactPath,
+          basepath: this.projectDir,
+          specification: specification
+        })
+        emitter.on("error", reject)
+        emitter.on("finish", resolve)
+      })
     }
   }
-}
-
-export function build(options: Options = {}): Promise<any> {
-  if (options.cscLink == null) {
-    options.cscLink = process.env.CSC_LINK
-  }
-  if (options.cscKeyPassword == null) {
-    options.cscKeyPassword = process.env.CSC_KEY_PASSWORD
-  }
-
-  if (options.githubToken == null) {
-    options.githubToken = process.env.GH_TOKEN || process.env.GH_TEST_TOKEN
-  }
-
-  return new Packager(options)
-    .build()
 }

@@ -16,6 +16,7 @@
     "typings/**/*.d.ts"
   ],
   "files": [
+    "typings/appdmg.d.ts",
     "typings/bluebird.d.ts",
     "typings/command-line-args.d.ts",
     "typings/electron-packager/electron-packager.d.ts",
@@ -28,6 +29,7 @@
     "typings/rimraf/rimraf.d.ts",
     "typings/source-map-support/source-map-support.d.ts",
     "src/build-cli.ts",
+    "src/builder.ts",
     "src/codeSign.ts",
     "src/gitHubPublisher.ts",
     "src/gitHubRequest.ts",

@@ -1,10 +1,5 @@
 import Promise = require("bluebird")
 
-Promise.config({
-  longStackTraces: true,
-  cancellation: true
-})
-
 export function printErrorAndExit(error: Error) {
   console.error(error.stack || error.message || error)
   process.exit(-1)
