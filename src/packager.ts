@@ -7,7 +7,6 @@ import { all, executeFinally } from "./promise"
 import { EventEmitter } from "events"
 import packager = require("electron-packager")
 import Promise = require("bluebird")
-import appDmg = require("appdmg")
 
 export interface PackagerOptions {
   arch?: string
@@ -308,7 +307,7 @@ export class Packager {
     if (this.options.platform === "win32") {
       return new Promise<string>((resolve, reject) => {
         const customOptions = buildMetadata == null ? null : buildMetadata.win
-        require("electron-installer-squirrel-windows")(Object.assign({
+        require("electron-squirrel-windows-installer")(Object.assign({
           name: this.metadata.name,
           path: distPath,
           product_name: this.metadata.name,
@@ -351,6 +350,7 @@ export class Packager {
 
         specification.contents[1].path = distPath
 
+        const appDmg = require("appdmg")
         const emitter = appDmg({
           target: artifactPath,
           basepath: this.projectDir,
