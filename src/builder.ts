@@ -7,33 +7,45 @@ import { log } from "./util"
 import * as path from "path"
 import Promise = require("bluebird")
 
+async function getGitUrlFromGitConfig(): Promise<string> {
+  let data: string = null
+  try {
+    data = await readFile(path.join(".git", "config"))
+  }
+  catch (e) {
+    if (e.code === "ENOENT") {
+      return null
+    }
+
+    throw e
+  }
+
+  const conf = data.split(/\r?\n/)
+  const i = conf.indexOf('[remote "origin"]')
+  if (i !== -1) {
+    let u = conf[i + 1]
+    if (!u.match(/^\s*url =/)) {
+      u = conf[i + 2]
+    }
+
+    if (u.match(/^\s*url =/)) {
+      return u.replace(/^\s*url = /, "")
+    }
+  }
+  return null
+}
+
 export async function createPublisher(packager: Packager, options: BuildOptions): Promise<Publisher> {
   const repo = packager.devMetadata.repository || packager.metadata.repository
   let info: Info = null
   if (repo == null) {
-    let data: string = null
-    try {
-      data = await readFile(path.join(".git", "config"))
-    }
-    catch (e) {
-      if (e.code !== "ENOENT") {
-        throw e
-      }
+    let url = process.env.TRAVIS_REPO_SLUG || process.env.APPVEYOR_PROJECT_SLUG
+    if (url == null) {
+      url = await getGitUrlFromGitConfig()
     }
 
-    if (data != null) {
-      const conf = data.split(/\r?\n/)
-      const i = conf.indexOf('[remote "origin"]')
-      if (i !== -1) {
-        let u = conf[i + 1]
-        if (!u.match(/^\s*url =/)) {
-          u = conf[i + 2]
-        }
-
-        if (u.match(/^\s*url =/)) {
-          info = parseRepositoryUrl(u.replace(/^\s*url = /, ""))
-        }
-      }
+    if (url != null) {
+      info = parseRepositoryUrl(url)
     }
 
     if (info == null) {
