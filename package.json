@@ -38,7 +38,7 @@
     "ts-babel": "^0.3.0",
     "tsconfig-glob": "^0.4.0",
     "tslint": "^3.3.0",
-    "typescript": "next"
+    "typescript": "^1.8.0-dev.20160125"
   },
   "repository": {
     "type": "git",

@@ -13,7 +13,7 @@ function versionNumber() {
 }
 
 describe("Artifacts Uploader", function () {
-  this.timeout(10 * 1000)
+  this.timeout(20 * 1000)
 
   xit("GitHub unauthorized", () => {
     return new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), "incorrect token")
@@ -21,13 +21,13 @@ describe("Artifacts Uploader", function () {
       .should.rejectedWith(/(Bad credentials|Unauthorized|API rate limit exceeded)/)
   })
   it("GitHub upload", () => {
-    const publisher = new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), "5103f80039bfe891c378d2d5b6db88ac73b0aa38")
+    const publisher = new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), "3dc016d009daaf45f506318c665aa6d5fe959781")
     return promises.executeFinally(
       publisher.upload(path.join(process.cwd(), "test", "test-app", "build", "icon.icns")),
       () => publisher.deleteRelease())
   })
   it("GitHub overwrite on upload", () => {
-    const publisher = new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), "5103f80039bfe891c378d2d5b6db88ac73b0aa38")
+    const publisher = new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), "3dc016d009daaf45f506318c665aa6d5fe959781")
     return promises.executeFinally(
       publisher.upload(path.join(process.cwd(), "test", "test-app", "build", "icon.icns"))
         .then(() => publisher.upload(path.join(process.cwd(), "test", "test-app", "build", "icon.icns"))),
