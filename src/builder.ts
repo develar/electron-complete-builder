@@ -1,15 +1,49 @@
 import { PackagerOptions, Packager } from "./packager"
 import { PublishOptions, Publisher, GitHubPublisher } from "./gitHubPublisher"
-import { fromUrl as parseRepositoryUrl } from "hosted-git-info"
+import { fromUrl as parseRepositoryUrl, Info } from "hosted-git-info"
 import { executeFinally } from "./promise"
+import { readFile } from "./promisifed-fs"
+import { log } from "./util"
+import * as path from "path"
 import Promise = require("bluebird")
 
-export function createPublisher(packager: Packager, options: BuildOptions): Publisher {
+export async function createPublisher(packager: Packager, options: BuildOptions): Promise<Publisher> {
   const repo = packager.devMetadata.repository || packager.metadata.repository
+  let info: Info = null
   if (repo == null) {
-    throw new Error("Please specify 'repository' in the dev package.json ('" + packager.devPackageFile + "')")
+    let data: string = null
+    try {
+      data = await readFile(path.join(".git", "config"))
+    }
+    catch (e) {
+      if (e.code !== "ENOENT") {
+        throw e
+      }
+    }
+
+    if (data != null) {
+      const conf = data.split(/\r?\n/)
+      const i = conf.indexOf('[remote "origin"]')
+      if (i !== -1) {
+        let u = conf[i + 1]
+        if (!u.match(/^\s*url =/)) {
+          u = conf[i + 2]
+        }
+
+        if (u.match(/^\s*url =/)) {
+          info = parseRepositoryUrl(u.replace(/^\s*url = /, ""))
+        }
+      }
+    }
+
+    if (info == null) {
+      log("Cannot detect repository by .git/config")
+      throw new Error("Please specify 'repository' in the dev package.json ('" + packager.devPackageFile + "')")
+    }
   }
-  const info = parseRepositoryUrl(typeof repo === "string" ? repo : repo.url)
+  else {
+    info = parseRepositoryUrl(typeof repo === "string" ? repo : repo.url)
+  }
   return new GitHubPublisher(info.user, info.project, packager.metadata.version, options.githubToken)
 }
 
@@ -35,14 +69,14 @@ export function build(options: BuildOptions = {}): Promise<any> {
   const publishTasks: Array<Promise<any>> = []
   const packager = new Packager(options)
   if (options.publish) {
-    let publisher: Publisher = null
+    let publisher: Promise<Publisher> = null
     packager.artifactCreated(path => {
       if (publisher == null) {
         publisher = createPublisher(packager, options)
       }
 
       if (publisher != null) {
-        publishTasks.push(publisher.upload(path))
+        publisher.then(it => publishTasks.push(it.upload(path)))
       }
     })
   }

@@ -15,7 +15,6 @@ Real project example — [onshape-desktop-shell](https://github.com/develar/onsh
 1. Ensure that required fields are specified in the application `package.json`:
 
   Standard `name`, `description`, `version` and `author`.
-  `repository` is required to publish artifacts to GitHub Releases.
 
   Custom `build` field must be specified:
   ```json

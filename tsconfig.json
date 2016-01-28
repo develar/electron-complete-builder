@@ -22,6 +22,7 @@
     "typings/electron-packager/electron-packager.d.ts",
     "typings/gh-api.d.ts",
     "typings/hosted-git-info.d.ts",
+    "typings/json-parse-helpfulerror.d.ts",
     "typings/mime/mime.d.ts",
     "typings/node/node.d.ts",
     "typings/progress-stream.d.ts",

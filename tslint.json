@@ -33,7 +33,8 @@
     ],
     "quotemark": [
       true,
-      "double"
+      "double",
+      "avoid-escape"
     ],
     "triple-equals": [
       true,

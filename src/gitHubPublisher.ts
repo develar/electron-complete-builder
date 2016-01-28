@@ -57,14 +57,14 @@ export class GitHubPublisher implements Publisher {
     const release = await this.releasePromise
     const parsedUrl = parseUrl(release.upload_url.substring(0, release.upload_url.indexOf("{")) + "?name=" + fileName)
     const fileStat = await stat(path)
-    const progressBar = new ProgressBar(`Uploading ${fileName} [:bar] :percent :etas`, {
-      total: fileStat.size,
-      incomplete: " ",
-      stream: process.stdout,
-      width: 20,
-    })
-
     for (let i = 0; i < 3; i++) {
+      const progressBar = new ProgressBar(`Uploading ${fileName} [:bar] :percent :etas`, {
+        total: fileStat.size,
+        incomplete: " ",
+        stream: process.stdout,
+        width: 20,
+      })
+
       try {
         return await doGitHubRequest<any>({
           hostname: parsedUrl.hostname,

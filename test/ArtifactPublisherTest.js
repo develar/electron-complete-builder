@@ -21,13 +21,13 @@ describe("Artifacts Uploader", function () {
       .should.rejectedWith(/(Bad credentials|Unauthorized|API rate limit exceeded)/)
   })
   it("GitHub upload", () => {
-    const publisher = new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), "ba036d6fbe744d512044a74ff2a26821951df086")
+    const publisher = new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), "c44c8c915e32ef5f1431a8a6dbc6fb19e2b15c08")
     return promises.executeFinally(
       publisher.upload(path.join(process.cwd(), "test", "test-app", "build", "icon.icns")),
       () => publisher.deleteRelease())
   })
   it("GitHub overwrite on upload", () => {
-    const publisher = new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), "ba036d6fbe744d512044a74ff2a26821951df086")
+    const publisher = new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), "c44c8c915e32ef5f1431a8a6dbc6fb19e2b15c08")
     return promises.executeFinally(
       publisher.upload(path.join(process.cwd(), "test", "test-app", "build", "icon.icns"))
         .then(() => publisher.upload(path.join(process.cwd(), "test", "test-app", "build", "icon.icns"))),

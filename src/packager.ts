@@ -1,7 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
 import { DEFAULT_APP_DIR_NAME, installDependencies, log, getElectronVersion, spawn } from "./util"
-import { renameFile, readFile, deleteDirectory } from "./promisifed-fs"
+import { renameFile, parseJsonFile, deleteDirectory } from "./promisifed-fs"
 import { createKeychain, deleteKeychain, CodeSigningInfo, generateKeychainName, sign } from "./codeSign"
 import { all, executeFinally } from "./promise"
 import { EventEmitter } from "events"
@@ -39,6 +39,7 @@ interface DevMetadata extends Metadata {
 
 interface DevBuildMetadata {
   osx: appdmg.Specification
+  win: any
 }
 
 interface AppMetadata extends Metadata {
@@ -112,7 +113,7 @@ export class Packager {
   async build(): Promise<any> {
     const buildPackageFile = this.devPackageFile
     const appPackageFile = this.projectDir === this.appDir ? buildPackageFile : path.join(this.appDir, "package.json")
-    await Promise.all(Array.from(new Set([buildPackageFile, appPackageFile]), readFile))
+    await Promise.all(Array.from(new Set([buildPackageFile, appPackageFile]), parseJsonFile))
       .then((result: any[]) => {
         this.metadata = result[result.length - 1]
         this.devMetadata = result[0]
@@ -302,9 +303,11 @@ export class Packager {
 
   // returns absolute artifact path
   private packageInDistributableFormat(arch: string, distPath: string): Promise<string> {
+    const buildMetadata = this.devMetadata.build
     const appName = this.metadata.name
     if (this.options.platform === "win32") {
-      return new Promise<any>((resolve, reject) => {
+      return new Promise<string>((resolve, reject) => {
+        const customOptions = buildMetadata == null ? null : buildMetadata.win
         require("electron-installer-squirrel-windows")(Object.assign({
           name: this.metadata.name,
           path: distPath,
@@ -314,12 +317,12 @@ export class Packager {
           description: this.metadata.description,
           authors: this.metadata.author,
           setup_icon: path.join(this.projectDir, "build", "icon.ico"),
-        }, this.metadata.windowsPackager || {}), (error: Error) => error == null ? resolve(null) : reject(error))
+        }, customOptions), (error: Error) => error == null ? resolve(null) : reject(error))
       })
         .then(() => renameFile(path.join(this.outDir, arch, appName + "Setup.exe"), path.join(this.outDir, appName + "Setup-" + this.metadata.version + ((arch === "x64") ? "-x64" : "") + ".exe")))
     }
     else {
-      return new Promise<any>((resolve, reject) => {
+      return new Promise<string>((resolve, reject) => {
         log("Creating DMG")
         const artifactPath = path.join(this.outDir, this.metadata.name + "-" + this.metadata.version + ".dmg")
 
@@ -338,7 +341,6 @@ export class Packager {
           ]
         }
 
-        const buildMetadata = this.devMetadata.build
         if (buildMetadata != null && buildMetadata.osx != null) {
           Object.assign(specification, buildMetadata.osx)
         }
@@ -355,7 +357,7 @@ export class Packager {
           specification: specification
         })
         emitter.on("error", reject)
-        emitter.on("finish", resolve)
+        emitter.on("finish", () => resolve(artifactPath))
       })
     }
   }

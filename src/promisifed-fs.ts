@@ -1,17 +1,22 @@
 import * as fs from "fs"
+import { parse as _parseJson } from "json-parse-helpfulerror"
 import rimraf = require("rimraf")
 import Promise = require("bluebird")
 
 const readFileAsync: ((filename: string, encoding?: string) => Promise<string | Buffer>) = Promise.promisify(fs.readFile)
 
-export function readFile(file: string): Promise<any> {
-  return readFileAsync(file, "utf8").
-    then((it: string) => parseJson(it, file))
+export function readFile(file: string): Promise<string> {
+  return <Promise<string>>readFileAsync(file, "utf8")
+}
+
+export function parseJsonFile(file: string): Promise<any> {
+  return readFile(file).
+    then(it => parseJson(it, file))
 }
 
 export function parseJson(data: string, path: string): any {
   try {
-    return JSON.parse(data)
+    return _parseJson(data)
   }
   catch (e) {
     if (e instanceof SyntaxError) {
@@ -35,6 +40,7 @@ export function deleteDirectory(path: string) {
   })
 }
 
+// returns new name
 export function renameFile(oldPath: string, newPath: string): Promise<string> {
   return new Promise<any>((resolve, reject) => {
     fs.rename(oldPath, newPath, error => error == null ? resolve(newPath) : reject(error))
