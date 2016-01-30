@@ -306,20 +306,24 @@ export class Packager {
       .thenReturn(this.outDir + "/" + resultPath)
   }
 
-  // returns absolute artifact path
   private packageInDistributableFormat(arch: string, distPath: string): Promise<any> {
     const buildMetadata = this.devMetadata.build
     const appName = this.metadata.name
     const outputDirectory = this.outDir + "-installer"
     const version = this.metadata.version
     if (this.options.platform === "win32") {
-      return new BluebirdPromise<any>((resolve, reject) => {
-        const customOptions = buildMetadata == null ? null : buildMetadata.win
-        const iconUrl = this.metadata.build.iconUrl
+      const customOptions = buildMetadata == null ? null : buildMetadata.win
+      let iconUrl = this.metadata.build.iconUrl
+      if (iconUrl == null || iconUrl.length === 0) {
+        if (customOptions != null) {
+          iconUrl = customOptions.iconUrl
+        }
         if (iconUrl == null || iconUrl.length === 0) {
           throw new Error("iconUrl is not specified, please see https://github.com/develar/electron-complete-builder#in-short")
         }
+      }
 
+      return new BluebirdPromise<any>((resolve, reject) => {
         require("electron-winstaller-temp-fork").build(Object.assign({
           name: this.metadata.name,
           appDirectory: this.outDir,
