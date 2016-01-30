@@ -30,8 +30,9 @@ describe("Artifacts Uploader", function () {
   })
   it("GitHub overwrite on upload", () => {
     const publisher = new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), token)
+    var upload = publisher.upload(path.join(process.cwd(), "test", "test-app", "build", "icon.icns"));
     return promises.executeFinally(
-      publisher.upload(path.join(process.cwd(), "test", "test-app", "build", "icon.icns"))
+      upload
         .then(() => publisher.upload(path.join(process.cwd(), "test", "test-app", "build", "icon.icns"))),
       () => publisher.deleteRelease())
   })

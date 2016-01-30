@@ -6,7 +6,7 @@ Complete solution to build ready for distribution and "auto update" installers o
 
 [electron-packager](https://github.com/maxogden/electron-packager),
 [appdmg](https://github.com/LinusU/node-appdmg) and
-[electron-installer-squirrel-windows](https://github.com/mongodb-js/electron-installer-squirrel-windows) are used under the hood.
+[windows-installer](https://github.com/electronjs/windows-installer) are used under the hood.
 
 Real project example — [onshape-desktop-shell](https://github.com/develar/onshape-desktop-shell).
 
@@ -20,11 +20,13 @@ Real project example — [onshape-desktop-shell](https://github.com/develar/onsh
   ```json
   "build": {
     "app-bundle-id": "your.id",
-    "app-category-type": "your.app.category.type"
+    "app-category-type": "your.app.category.type",
+    "iconUrl": "(windows only) A URL to an ICO file to use as the application icon"
   }
   ```
   This object will be used as source of [electron-packager](https://www.npmjs.com/package/electron-packager) options. You can specify any other options here.
 
+  Please note — [local icon file url is not accepted](https://github.com/atom/grunt-electron-installer/issues/73), must be https/http. If you don't plan to build windows installer, you can omit it.
 
 2. Create directory `build` in the root of the project and put your `background.png` (OS X DMG background), `icon.icns` (OS X app icon) and `icon.ico` (Windows app icon).
 
@@ -70,14 +72,14 @@ In the development `package.json` custom `build` field can be specified to custo
 As you can see, you need to customize OS X options only if you want to provide custom `x, y`.
 Don't customize paths to background and icon, — just follow conventions (if you don't want to use `build` as directory of resources — please create issue to ask ability to customize it).
 
-See [OS X options](https://www.npmjs.com/package/appdmg#json-specification) and [Windows options](https://github.com/mongodb-js/electron-installer-squirrel-windows#opts).
+See [OS X options](https://www.npmjs.com/package/appdmg#json-specification) and [Windows options](https://github.com/electronjs/windows-installer#configuring).
 
 # Auto Update
 electron-complete-builder produces all required artifacts:
 
 * `.dmg`: OS X installer, required for OS X user to initial install.
 * `-mac.zip`: required for Squirrel.Mac.
-* `.exe` and `-x64.exe`: Windows installer, required for Windows user to initial install. Please note — [your app must handle Squirrel.Windows events](https://github.com/mongodb-js/electron-installer-squirrel-windows#integration). See [real example](https://github.com/develar/onshape-desktop-shell/blob/master/src/WinSquirrelStartupEventHandler.ts).
+* `.exe` and `-x64.exe`: Windows installer, required for Windows user to initial install. Please note — [your app must handle Squirrel.Windows events](https://github.com/electronjs/windows-installer#handling-squirrel-events). See [real example](https://github.com/develar/onshape-desktop-shell/blob/master/src/WinSquirrelStartupEventHandler.ts).
 * `.full-nupkg`: required for Squirrel.Windows.
 
 You need to deploy somewhere [releases/downloads server](https://github.com/GitbookIO/nuts).
@@ -102,7 +104,7 @@ travis encrypt 'CSC_KEY_PASSWORD=beAwareAboutBashEscaping!!!' --add
 ```
 
 ## AppVeyor
-Windows code siging is not yet supported in a smart way, you need to pass corresponding [electron-installer-squirrel-windows](https://github.com/mongodb-js/electron-installer-squirrel-windows) options [directly](https://github.com/develar/electron-complete-builder/pull/1).
+Windows code signing is not yet supported in a smart way, you need to pass corresponding [windows-installer](https://github.com/electronjs/windows-installer#configuring) options directly.
 
 # Windows
 Hint: You don't need a windows machine to build windows artifacts — use [AppVeyor](http://www.appveyor.com/). See  [sample appveyor.yml to build Electron app on windows](https://github.com/develar/onshape-desktop-shell/blob/master/appveyor.yml).

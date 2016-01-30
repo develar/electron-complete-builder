@@ -1,4 +1,8 @@
-import Promise = require("bluebird")
+import { Promise as BluebirdPromise } from "bluebird"
+import { tsAwaiter } from "./awaiter"
+
+const __awaiter = tsAwaiter
+Array.isArray(__awaiter)
 
 export function printErrorAndExit(error: Error) {
   console.error(error.stack || error.message || error)
@@ -43,9 +47,9 @@ export class NestedError extends Error {
   }
 }
 
-export function all(promises: Array<Promise<any>>): Promise<any> {
+export function all(promises: Array<Promise<any>>): BluebirdPromise<any> {
   const errors: Array<Error> = []
-  return Promise.all(promises.map(it => it.catch(it => errors.push(it))))
+  return BluebirdPromise.all(promises.map(it => it.catch(it => errors.push(it))))
     .then(() => {
       if (errors.length === 1) {
         throw errors[0]

@@ -5,8 +5,12 @@ import { renameFile, parseJsonFile, deleteDirectory } from "./promisifed-fs"
 import { createKeychain, deleteKeychain, CodeSigningInfo, generateKeychainName, sign } from "./codeSign"
 import { all, executeFinally } from "./promise"
 import { EventEmitter } from "events"
+import { Promise as BluebirdPromise } from "bluebird"
+import { tsAwaiter } from "./awaiter"
 import packager = require("electron-packager")
-import Promise = require("bluebird")
+
+const __awaiter = tsAwaiter
+Array.isArray(__awaiter)
 
 export interface PackagerOptions {
   arch?: string
@@ -53,6 +57,7 @@ interface AppMetadata extends Metadata {
 }
 
 interface BuildMetadata {
+  iconUrl: string
 }
 
 function addHandler(emitter: EventEmitter, event: string, handler: Function) {
@@ -74,7 +79,6 @@ export class Packager {
   private appDir: string
 
   private outDir: string
-  private distDir: string
 
   public metadata: AppMetadata
   public devMetadata: DevMetadata
@@ -112,19 +116,14 @@ export class Packager {
   async build(): Promise<any> {
     const buildPackageFile = this.devPackageFile
     const appPackageFile = this.projectDir === this.appDir ? buildPackageFile : path.join(this.appDir, "package.json")
-    await Promise.all(Array.from(new Set([buildPackageFile, appPackageFile]), parseJsonFile))
+    await BluebirdPromise.all(Array.from(new Set([buildPackageFile, appPackageFile]), parseJsonFile))
       .then((result: any[]) => {
         this.metadata = result[result.length - 1]
         this.devMetadata = result[0]
         this.checkMetadata(appPackageFile)
 
         this.electronVersion = getElectronVersion(this.devMetadata, buildPackageFile)
-        this.distDir = path.join(this.projectDir, "dist")
-        this.outDir = this.computeOutDirectory()
       })
-
-    log("Removing %s", this.outDir)
-    await deleteDirectory(this.outDir)
 
     const cleanupTasks: Array<() => Promise<any>> = []
     return executeFinally(this.doBuild(cleanupTasks), error => all(cleanupTasks.map(it => it())))
@@ -139,12 +138,16 @@ export class Packager {
     for (let arch of archs) {
       await this.installAppDependencies(arch)
 
+      this.outDir = path.join(this.projectDir, "dist", this.metadata.name + "-" + this.options.platform + "-" + arch)
+      log("Removing %s", this.outDir)
+      await deleteDirectory(this.outDir)
+
       const distPath = path.join(this.outDir, this.metadata.name + (isMac ? ".app" : "-win32-" + arch))
       if (isMac) {
         if (keychainName == null && (this.options.cscLink != null && this.options.cscKeyPassword != null)) {
           keychainName = generateKeychainName()
           cleanupTasks.push(() => deleteKeychain(keychainName))
-          await Promise.all([
+          await BluebirdPromise.all([
             this.pack(arch),
             createKeychain(keychainName, this.options.cscLink, this.options.cscKeyPassword)
               .then(it => codeSigningInfo = it)
@@ -155,18 +158,27 @@ export class Packager {
         }
         await this.signMac(distPath, codeSigningInfo)
       }
+      else if (this.options.dist && this.options.platform === "win32") {
+        const installerOut = this.outDir + "-installer"
+        log("Removing %s", installerOut)
+        await BluebirdPromise.all([this.pack(arch), deleteDirectory(installerOut)])
+      }
       else {
         await this.pack(arch)
       }
 
       if (this.options.dist) {
         const distPromise = this.packageInDistributableFormat(arch, distPath)
-          .then(path => this.dispatchArtifactCreated(path))
-        await (isMac ? Promise.all([
-          distPromise,
-          this.zipMacApp()
-            .then(path => this.dispatchArtifactCreated(path))
-        ]) : distPromise)
+        if (isMac) {
+          await BluebirdPromise.all([
+            distPromise,
+            this.zipMacApp()
+              .then(it => this.dispatchArtifactCreated(it))
+          ])
+        }
+        else {
+          await distPromise
+        }
       }
     }
 
@@ -213,17 +225,6 @@ export class Packager {
     return absoluteAppPath
   }
 
-  private computeOutDirectory() {
-    let relativeDirectory: string
-    if (this.isMac) {
-      relativeDirectory = this.metadata.name + "-darwin-x64"
-    }
-    else {
-      relativeDirectory = "win"
-    }
-    return path.join(this.distDir, relativeDirectory)
-  }
-
   private checkMetadata(appPackageFile: string): void {
     const reportError = (missedFieldName: string) => {
       throw new Error("Please specify '" + missedFieldName + "' in the application package.json ('" + appPackageFile + "')")
@@ -244,7 +245,8 @@ export class Packager {
           JSON.stringify({
             build: {
               "app-bundle-id": "your.id",
-              "app-category-type": "your.app.category.type"
+              "app-category-type": "your.app.category.type",
+              "iconUrl": "see https://github.com/develar/electron-complete-builder#in-short",
             }
           }, null, "  ") + "\n\n is required.\n")
     }
@@ -254,10 +256,10 @@ export class Packager {
   }
 
   private pack(arch: string) {
-    return new Promise((resolve, reject) => {
-      packager(Object.assign({
+    return new BluebirdPromise((resolve, reject) => {
+      const options = Object.assign({
         dir: this.appDir,
-        out: this.options.platform === "win32" ? path.join(this.distDir, "win") : this.distDir,
+        out: path.dirname(this.outDir),
         name: this.metadata.name,
         platform: this.options.platform,
         arch: arch,
@@ -274,7 +276,11 @@ export class Packager {
           ProductName: this.metadata.name,
           InternalName: this.metadata.name,
         }
-      }, this.metadata.build), error => error == null ? resolve(null) : reject(error))
+      }, this.metadata.build)
+
+      // this option only for windows-installer
+      delete options.iconUrl
+      packager(options, error => error == null ? resolve(null) : reject(error))
     })
   }
 
@@ -301,29 +307,45 @@ export class Packager {
   }
 
   // returns absolute artifact path
-  private packageInDistributableFormat(arch: string, distPath: string): Promise<string> {
+  private packageInDistributableFormat(arch: string, distPath: string): Promise<any> {
     const buildMetadata = this.devMetadata.build
     const appName = this.metadata.name
+    const outputDirectory = this.outDir + "-installer"
+    const version = this.metadata.version
     if (this.options.platform === "win32") {
-      return new Promise<string>((resolve, reject) => {
+      return new BluebirdPromise<any>((resolve, reject) => {
         const customOptions = buildMetadata == null ? null : buildMetadata.win
-        require("electron-squirrel-windows-installer")(Object.assign({
+        const iconUrl = this.metadata.build.iconUrl
+        if (iconUrl == null || iconUrl.length === 0) {
+          throw new Error("iconUrl is not specified, please see https://github.com/develar/electron-complete-builder#in-short")
+        }
+
+        require("electron-winstaller-temp-fork").build(Object.assign({
           name: this.metadata.name,
-          path: distPath,
-          product_name: this.metadata.name,
-          out: path.join(this.outDir, arch),
-          version: this.metadata.version,
+          appDirectory: this.outDir,
+          outputDirectory: outputDirectory,
+          productName: this.metadata.name,
+          version: version,
           description: this.metadata.description,
           authors: this.metadata.author,
-          setup_icon: path.join(this.projectDir, "build", "icon.ico"),
+          iconUrl: iconUrl,
+          setupIcon: path.join(this.projectDir, "build", "icon.ico"),
         }, customOptions), (error: Error) => error == null ? resolve(null) : reject(error))
       })
-        .then(() => renameFile(path.join(this.outDir, arch, appName + "Setup.exe"), path.join(this.outDir, appName + "Setup-" + this.metadata.version + ((arch === "x64") ? "-x64" : "") + ".exe")))
+        .then(() => {
+          const archSuffix = (arch === "x64") ? "-x64" : ""
+          return Promise.all([
+            renameFile(path.join(outputDirectory, appName + "Setup.exe"), path.join(outputDirectory, appName + "Setup-" + version + archSuffix + ".exe"))
+              .then(it => this.dispatchArtifactCreated(it)),
+            renameFile(path.join(outputDirectory, appName + "-" + version + "-full.nupkg"), path.join(outputDirectory, appName + "-" + version + archSuffix + "-full.nupkg"))
+              .then(it => this.dispatchArtifactCreated(it))
+          ])
+        })
     }
     else {
-      return new Promise<string>((resolve, reject) => {
+      const artifactPath = path.join(this.outDir, this.metadata.name + "-" + this.metadata.version + ".dmg")
+      return new BluebirdPromise<any>((resolve, reject) => {
         log("Creating DMG")
-        const artifactPath = path.join(this.outDir, this.metadata.name + "-" + this.metadata.version + ".dmg")
 
         const specification: appdmg.Specification = {
           title: this.metadata.name,
@@ -357,8 +379,9 @@ export class Packager {
           specification: specification
         })
         emitter.on("error", reject)
-        emitter.on("finish", () => resolve(artifactPath))
+        emitter.on("finish", () => resolve())
       })
+        .then(() => this.dispatchArtifactCreated(artifactPath))
     }
   }
 }

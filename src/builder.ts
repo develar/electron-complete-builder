@@ -5,7 +5,11 @@ import { executeFinally } from "./promise"
 import { readFile } from "./promisifed-fs"
 import { log } from "./util"
 import * as path from "path"
-import Promise = require("bluebird")
+import { Promise as BluebirdPromise } from "bluebird"
+import { tsAwaiter } from "./awaiter"
+
+const __awaiter = tsAwaiter
+Array.isArray(__awaiter)
 
 async function getGitUrlFromGitConfig(): Promise<string> {
   let data: string = null
@@ -78,17 +82,17 @@ export function build(options: BuildOptions = {}): Promise<any> {
     options.dist = true
   }
 
-  const publishTasks: Array<Promise<any>> = []
+  const publishTasks: Array<BluebirdPromise<any>> = []
   const packager = new Packager(options)
   if (options.publish) {
-    let publisher: Promise<Publisher> = null
+    let publisher: BluebirdPromise<Publisher> = null
     packager.artifactCreated(path => {
       if (publisher == null) {
-        publisher = createPublisher(packager, options)
+        publisher = <BluebirdPromise<Publisher>>createPublisher(packager, options)
       }
 
       if (publisher != null) {
-        publisher.then(it => publishTasks.push(it.upload(path)))
+        publisher.then(it => publishTasks.push(<BluebirdPromise<any>>it.upload(path)))
       }
     })
   }
@@ -100,6 +104,7 @@ export function build(options: BuildOptions = {}): Promise<any> {
       for (let task of publishTasks) {
         task.cancel()
       }
+      return null
     }
   })
 }

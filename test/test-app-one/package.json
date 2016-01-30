@@ -8,7 +8,7 @@
   },
   "author": "Foo Bar",
   "devDependencies": {
-    "electron-prebuilt": "^0.36.0"
+    "electron-prebuilt": "^0.36.7"
   },
   "build": {
     "app-bundle-id": "your.id",

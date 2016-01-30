@@ -3,11 +3,11 @@ import { IncomingMessage, ClientRequest } from "http"
 import * as https from "https"
 import { createWriteStream } from "fs"
 import { parse as parseUrl } from "url"
-import Promise = require("bluebird")
+import { Promise as BluebirdPromise } from "bluebird"
 
 const maxRedirects = 10
 
-export const download = Promise.promisify(_download)
+export const download = BluebirdPromise.promisify(_download)
 
 function _download(url: string, destination: string, callback: (error: Error) => void): void {
   doDownload(url, destination, 0, callback)

@@ -8,7 +8,7 @@ declare module 'bluebird' {
   }
 
   class BluebirdPromise<T> implements Promise<T> {
-    constructor(callback: (resolve: (thenableOrResult?: T | PromiseLike<T>) => void, reject: (error: any) => void, onCancel?: (handler: () => void) => void) => void)
+    constructor(callback: (resolve: (value?: T | PromiseLike<T>) => void, reject: (reason?: Error) => void, onCancel?: (handler: () => void) => void) => void)
 
     static config(options: any): void
 
@@ -17,6 +17,8 @@ declare module 'bluebird' {
     static mapSeries<T>(items: Iterable<T>, mapper: (item: T) => BluebirdPromise<any>): BluebirdPromise<any>
 
     static reject(error: Error): BluebirdPromise<any>
+
+    static coroutine(generator: Function): Function
 
     /**
      * Returns a function that will wrap the given `nodeFunction`. Instead of taking a callback, the returned function will return a promise whose fate is decided by the callback behavior of the given node function. The node function should conform to node.js convention of accepting a callback as last argument and calling that callback with error as the first argument and success value on the second argument.
@@ -37,8 +39,7 @@ declare module 'bluebird' {
     static resolve<T>(value: T | PromiseLike<T>): BluebirdPromise<T>
     static resolve(): BluebirdPromise<void>
 
-    then<TResult>(onfulfilled?: (value: T) => TResult | PromiseLike<TResult>, onrejected?: (reason: any) => TResult | PromiseLike<TResult>): BluebirdPromise<TResult>;
-    then<TResult>(onfulfilled?: (value: T) => TResult | PromiseLike<TResult>, onrejected?: (reason: any) => void): BluebirdPromise<TResult>;
+    then<R>(fulfilled: (value: T) => R | PromiseLike<R>, rejected?: (reason: any) => R | PromiseLike<R>): BluebirdPromise<R>
 
     //noinspection ReservedWordAsName
     catch(onrejected?: (reason: any) => T | PromiseLike<T>): BluebirdPromise<T>
@@ -58,5 +59,5 @@ declare module 'bluebird' {
     value(): T
   }
 
-  export = BluebirdPromise;
+  export { BluebirdPromise as Promise }
 }

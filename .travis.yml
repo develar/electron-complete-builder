@@ -9,6 +9,15 @@ cache:
     - test/testApp/node_modules
     - $HOME/.electron
     - $HOME/.npm
+    - /usr/local/Cellar
+    - /Library/Caches/Homebrew
+    - /usr/local/Library
+
+before_install:
+  - brew update
+  - brew install Caskroom/cask/xquartz
+  - brew install wine
+  - brew install mono
 
 install:
 - rm -rf ~/.nvm

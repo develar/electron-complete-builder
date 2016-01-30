@@ -5,7 +5,11 @@ import { build } from "./builder"
 import { PublishOptions } from "./gitHubPublisher"
 import { commonArgs, log } from "./util"
 import { printErrorAndExit } from "./promise"
+import { tsAwaiter } from "./awaiter"
 import cla = require("command-line-args")
+
+const __awaiter = tsAwaiter
+Array.isArray(__awaiter)
 
 interface CliOptions extends PackagerOptions, PublishOptions {
   build: boolean

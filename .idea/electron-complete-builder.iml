@@ -18,6 +18,7 @@
       <excludeFolder url="file://$MODULE_DIR$/node_modules/babylon" />
       <excludeFolder url="file://$MODULE_DIR$/node_modules/electron-packager" />
       <excludeFolder url="file://$MODULE_DIR$/node_modules/ts-babel" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/tslint" />
       <excludeFolder url="file://$MODULE_DIR$/node_modules/typescript" />
       <excludeFolder url="file://$MODULE_DIR$/test/test-app-one/dist" />
       <excludeFolder url="file://$MODULE_DIR$/test/test-app/app/node_modules" />

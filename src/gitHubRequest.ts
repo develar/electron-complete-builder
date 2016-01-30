@@ -2,9 +2,13 @@ import * as https from "https"
 import { RequestOptions } from "https"
 import { IncomingMessage, ClientRequest } from "http"
 import { addTimeOutHandler } from "./httpRequest"
-import Promise = require("bluebird")
+import { Promise as BluebirdPromise } from "bluebird"
+import { tsAwaiter } from "./awaiter"
 
-export function gitHubRequest<T>(path: string, token: string, data: { [name: string]: any; } = null, method: string = "GET"): Promise<T> {
+const __awaiter = tsAwaiter
+Array.isArray(__awaiter)
+
+export function gitHubRequest<T>(path: string, token: string, data: { [name: string]: any; } = null, method: string = "GET"): BluebirdPromise<T> {
   const options: any = {
     hostname: "api.github.com",
     path: path,
@@ -24,12 +28,12 @@ export function gitHubRequest<T>(path: string, token: string, data: { [name: str
   return doGitHubRequest<T>(options, token, it => it.end(encodedData))
 }
 
-export function doGitHubRequest<T>(options: RequestOptions, token: string, requestProcessor: (request: ClientRequest, reject: (error: Error) => void) => void): Promise<T> {
+export function doGitHubRequest<T>(options: RequestOptions, token: string, requestProcessor: (request: ClientRequest, reject: (error: Error) => void) => void): BluebirdPromise<T> {
   if (token != null) {
     (<any>options.headers).authorization = "token " + token
   }
 
-  return new Promise<T>((resolve, reject, onCancel) => {
+  return new BluebirdPromise<T>((resolve, reject, onCancel) => {
     const request = https.request(options, (response: IncomingMessage) => {
       try {
         if (response.statusCode === 404) {

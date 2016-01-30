@@ -6,9 +6,13 @@ import * as mime from "mime"
 import { stat } from "./promisifed-fs"
 import { createReadStream } from "fs"
 import { gitHubRequest, HttpError, doGitHubRequest } from "./gitHubRequest"
+import { Promise as BluebirdPromise } from "bluebird"
+import { tsAwaiter } from "./awaiter"
 import progressStream = require("progress-stream")
 import ProgressBar = require("progress")
-import Promise = require("bluebird")
+
+const __awaiter = tsAwaiter
+Array.isArray(__awaiter)
 
 export interface Publisher {
   upload(path: string): Promise<any>
@@ -21,7 +25,7 @@ export interface PublishOptions {
 
 export class GitHubPublisher implements Publisher {
   private tag: string
-  private _releasePromise: Promise<Release>
+  private _releasePromise: BluebirdPromise<Release>
 
   public get releasePromise(): Promise<Release> {
     return this._releasePromise
@@ -33,7 +37,7 @@ export class GitHubPublisher implements Publisher {
     }
 
     this.tag = "v" + version
-    this._releasePromise = this.init()
+    this._releasePromise = <BluebirdPromise<Release>>this.init()
   }
 
   private async init(): Promise<GetReleaseResult> {
@@ -49,15 +53,15 @@ export class GitHubPublisher implements Publisher {
     }
 
     log("Release %s doesn't exists, creating one", this.tag)
-    return await this.createRelease()
+    return this.createRelease()
   }
 
-  public async upload(path: string): Promise<void> {
+  async upload(path: string): Promise<void> {
     const fileName = basename(path)
     const release = await this.releasePromise
     const parsedUrl = parseUrl(release.upload_url.substring(0, release.upload_url.indexOf("{")) + "?name=" + fileName)
     const fileStat = await stat(path)
-    for (let i = 0; i < 3; i++) {
+    uploadAttempt: for (let i = 0; i < 3; i++) {
       const progressBar = new ProgressBar(`Uploading ${fileName} [:bar] :percent :etas`, {
         total: fileStat.size,
         incomplete: " ",
@@ -92,14 +96,16 @@ export class GitHubPublisher implements Publisher {
           const httpError = <HttpError>e
           if (httpError.response.statusCode === 422 && httpError.description != null && httpError.description.errors != null && httpError.description.errors[0].code === "already_exists") {
             // delete old artifact and re-upload
+            log("Artifact %s already exists, overwrite one", fileName)
             const assets = await gitHubRequest<Array<Asset>>(`/repos/${this.owner}/${this.repo}/releases/${release.id}/assets`, this.token)
             for (let asset of assets) {
               if (asset.name === fileName) {
-                log("Artifact %s already exists, overwrite one", fileName)
                 await gitHubRequest<void>(`/repos/${this.owner}/${this.repo}/releases/assets/${asset.id}`, this.token, null, "DELETE")
-                break
+                continue uploadAttempt
               }
             }
+
+            log("Artifact %s not found, trying to upload again", fileName)
             continue
           }
         }
@@ -109,8 +115,8 @@ export class GitHubPublisher implements Publisher {
     }
   }
 
-  private async createRelease() {
-    return await gitHubRequest<Release>(`/repos/${this.owner}/${this.repo}/releases`, this.token, {
+  private createRelease() {
+    return gitHubRequest<Release>(`/repos/${this.owner}/${this.repo}/releases`, this.token, {
       tag_name: this.tag,
       name: this.tag,
       draft: true,
@@ -118,12 +124,12 @@ export class GitHubPublisher implements Publisher {
   }
 
   //noinspection JSUnusedGlobalSymbols
-  deleteRelease(): Promise<void> {
+  deleteRelease(): BluebirdPromise<void> {
     if (this._releasePromise.isFulfilled()) {
       return gitHubRequest<void>(`/repos/${this.owner}/${this.repo}/releases/${this._releasePromise.value().id}`, this.token, null, "DELETE")
     }
     else {
-      return Promise.resolve()
+      return BluebirdPromise.resolve()
     }
   }
 }

@@ -9,7 +9,10 @@
     "noResolve": true,
     "noEmitOnError": true,
     "inlineSources": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "noImplicitReturns": true,
+    "noEmitHelpers": true,
+    "noFallthroughCasesInSwitch": true
   },
   "filesGlob": [
     "src/*.ts",
@@ -29,6 +32,7 @@
     "typings/progress/progress.d.ts",
     "typings/rimraf/rimraf.d.ts",
     "typings/source-map-support/source-map-support.d.ts",
+    "src/awaiter.ts",
     "src/build-cli.ts",
     "src/builder.ts",
     "src/codeSign.ts",

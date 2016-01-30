@@ -1,10 +1,10 @@
 import { execFile, spawn as _spawn } from "child_process"
+import { Promise as BluebirdPromise } from "bluebird"
 import "source-map-support/register"
-import Promise = require("bluebird")
 
 export const log = console.log
 
-Promise.config({
+BluebirdPromise.config({
   longStackTraces: true,
   cancellation: true
 })
@@ -17,9 +17,9 @@ export const commonArgs: any[] = [{
   description: "Relative (to the working directory) path to the folder containing the application package.json. Working directory or app/ by default."
 }]
 
-const execFileAsync: (file: string, args?: string[], options?: ExecOptions) => Promise<Buffer[]> = (<any>Promise.promisify(execFile, {multiArgs: true}))
+const execFileAsync: (file: string, args?: string[], options?: ExecOptions) => BluebirdPromise<Buffer[]> = (<any>BluebirdPromise.promisify(execFile, {multiArgs: true}))
 
-export function installDependencies(appDir: string, arch: string, electronVersion: string): Promise<any> {
+export function installDependencies(appDir: string, arch: string, electronVersion: string): BluebirdPromise<any> {
   log("Installing app dependencies for arch %s to %s", arch || process.arch, appDir)
   const env = Object.assign({}, process.env, {
     npm_config_disturl: "https://atom.io/download/atom-shell",
@@ -68,12 +68,12 @@ interface SpawnOptions extends BaseExecOptions {
   detached?: boolean
 }
 
-export function exec(file: string, args?: string[], options?: ExecOptions): Promise<Buffer[]> {
+export function exec(file: string, args?: string[], options?: ExecOptions): BluebirdPromise<Buffer[]> {
   return execFileAsync(file, args, options)
 }
 
-export function spawn(command: string, args?: string[], options?: SpawnOptions): Promise<any> {
-  return new Promise<any>((resolve, reject) => {
+export function spawn(command: string, args?: string[], options?: SpawnOptions): BluebirdPromise<any> {
+  return new BluebirdPromise<any>((resolve, reject) => {
     const p = _spawn(command, args, options)
     p.on("close", (code: number) => code === 0 ? resolve() : reject(new Error(command + " exited with code " + code)))
   })

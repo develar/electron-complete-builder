@@ -4,8 +4,12 @@ import { download } from "./httpRequest"
 import { tmpdir } from "os"
 import * as path from "path"
 import { executeFinally, all } from "./promise"
-import Promise = require("bluebird")
-import crypto = require("crypto")
+import { Promise as BluebirdPromise } from "bluebird"
+import { randomBytes } from "crypto"
+import { tsAwaiter } from "./awaiter"
+
+const __awaiter = tsAwaiter
+Array.isArray(__awaiter)
 
 export interface CodeSigningInfo {
   cscName: string
@@ -13,7 +17,7 @@ export interface CodeSigningInfo {
 }
 
 function randomString(): string {
-  return crypto.randomBytes(8).toString("hex")
+  return randomBytes(8).toString("hex")
 }
 
 export function generateKeychainName(): string {
@@ -28,7 +32,7 @@ export function createKeychain(keychainName: string, cscLink: string, cscKeyPass
   return executeFinally(Promise.all([
       download("https://developer.apple.com/certificationauthority/AppleWWDRCA.cer", appleCertPath),
       download(cscLink, developerCertPath),
-      Promise.mapSeries([
+      BluebirdPromise.mapSeries([
         ["create-keychain", "-p", keychainPassword, keychainName],
         ["unlock-keychain", "-p", keychainPassword, keychainName],
         ["set-keychain-settings", "-t", "3600", "-u", keychainName]
@@ -54,7 +58,7 @@ async function importCerts(keychainName: string, appleCertPath: string, develope
   }
 }
 
-function extractCommonName(password: string, certPath: string): Promise<string> {
+function extractCommonName(password: string, certPath: string): BluebirdPromise<string> {
   return exec("openssl", ["pkcs12", "-nokeys", "-nodes", "-passin", "pass:" + password, "-nomacver", "-clcerts", "-in", certPath])
     .then(result => {
       const match = result[0].toString().match(/^subject.*\/CN=([^\/]+)/m)
@@ -67,7 +71,7 @@ function extractCommonName(password: string, certPath: string): Promise<string> 
     })
 }
 
-export function sign(path: string, options: CodeSigningInfo): Promise<any> {
+export function sign(path: string, options: CodeSigningInfo): BluebirdPromise<any> {
   const args = ["--deep", "--force", "--sign", options.cscName, path]
   if (options.cscKeychainName != null) {
     args.push("--keychain", options.cscKeychainName)
@@ -75,7 +79,7 @@ export function sign(path: string, options: CodeSigningInfo): Promise<any> {
   return exec("codesign", args)
 }
 
-export function deleteKeychain(keychainName: string, ignoreNotFound: boolean = true): Promise<any> {
+export function deleteKeychain(keychainName: string, ignoreNotFound: boolean = true): BluebirdPromise<any> {
   const result = exec("security", ["delete-keychain", keychainName])
   if (ignoreNotFound) {
     return result.catch(error => {

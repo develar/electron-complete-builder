@@ -1,14 +1,20 @@
 <component name="ProjectDictionaryState">
   <dictionary name="develar">
     <words>
+      <w>appveyor</w>
       <w>archs</w>
+      <w>awaiter</w>
       <w>clcerts</w>
+      <w>coroutine</w>
       <w>crypto</w>
       <w>disturl</w>
+      <w>enoent</w>
       <w>github</w>
       <w>globaldots</w>
       <w>nokeys</w>
       <w>nomacver</w>
+      <w>nupkg</w>
+      <w>nuspec</w>
       <w>passin</w>
       <w>pkcs</w>
       <w>postinstall</w>
@@ -16,6 +22,7 @@
       <w>repos</w>
       <w>rimraf</w>
       <w>tsconfig</w>
+      <w>winstaller</w>
     </words>
   </dictionary>
 </component>
