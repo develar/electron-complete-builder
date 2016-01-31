@@ -1,9 +1,6 @@
 platform:
   - x64
 
-environment:
-  nodejs_version: "5 x64"
-
 cache:
   - node_modules
   - '%APPDATA%\npm-cache'
@@ -13,7 +10,7 @@ init:
   - git config --global core.autocrlf input
 
 install:
-  - ps: Install-Product node $env:nodejs_version
+  - ps: Install-Product node 5 x64
   - npm prune
   - npm install
 
