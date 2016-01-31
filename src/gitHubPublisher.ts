@@ -8,6 +8,7 @@ import { createReadStream } from "fs"
 import { gitHubRequest, HttpError, doGitHubRequest } from "./gitHubRequest"
 import { Promise as BluebirdPromise } from "bluebird"
 import { tsAwaiter } from "./awaiter"
+import { ReadStream } from "tty"
 import progressStream = require("progress-stream")
 import ProgressBar = require("progress")
 
@@ -62,12 +63,12 @@ export class GitHubPublisher implements Publisher {
     const parsedUrl = parseUrl(release.upload_url.substring(0, release.upload_url.indexOf("{")) + "?name=" + fileName)
     const fileStat = await stat(path)
     uploadAttempt: for (let i = 0; i < 3; i++) {
-      const progressBar = new ProgressBar(`Uploading ${fileName} [:bar] :percent :etas`, {
+      const progressBar = (<ReadStream>process.stdin).isTTY ? new ProgressBar(`Uploading ${fileName} [:bar] :percent :etas`, {
         total: fileStat.size,
         incomplete: " ",
         stream: process.stdout,
         width: 20,
-      })
+      }) : null
 
       try {
         return await doGitHubRequest<any>({
@@ -87,7 +88,7 @@ export class GitHubPublisher implements Publisher {
             .pipe(progressStream({
               length: fileStat.size,
               time: 1000
-            }, progress => progressBar.tick(progress.delta)))
+            }, progress => progressBar == null ? console.log(".") : progressBar.tick(progress.delta)))
             .pipe(request)
         })
       }

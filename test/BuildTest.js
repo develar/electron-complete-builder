@@ -1,56 +1,63 @@
-const assertThat = require("should/as-function")
-const path = require("path")
-const fs = require('fs')
-const plist = require("plist")
-const Packager = require("../out/packager")
-const util = require("../out/util")
-const promisifedFs = require("../out/promisifed-fs")
-const codeSignData = require("./codeSignData")
-require("should")
+import test from "ava";
+import fse from "fs-extra";
+import tmp from "tmp";
+import Promise from "bluebird";
+import assertThat from "should/as-function";
+import * as path from "path";
+import {parse as parsePlist} from "plist";
 
-function assertPack(projectDir, platform) {
-  const packager = new Packager.Packager({
+const copyDir = Promise.promisify(fse.copy)
+const tmpDir = Promise.promisify(tmp.dir)
+
+async function assertPack(assert, projectDir, platform) {
+  if (platform === "win32") {
+    // win test uses the same dir as mac test, but we cannot share node_modules (because tests executed in parallel)
+    let dir = await tmpDir()
+    await copyDir(projectDir, dir, {
+      filter: function (p) {
+        const basename = path.basename(p);
+        return basename !== "dist" && basename !== "node_modules" && basename[0] !== "."
+      }
+    })
+    projectDir = dir
+  }
+
+  const packager = new Packager({
     projectDir: projectDir,
-    cscLink: codeSignData.CSC_LINK,
-    cscKeyPassword: codeSignData.CSC_KEY_PASSWORD,
+    cscLink: CSC_LINK,
+    cscKeyPassword: CSC_KEY_PASSWORD,
     dist: true,
     platform: platform,
   })
-  return promisifedFs.deleteDirectory(path.join(projectDir, "dist"))
-    .then(() => {
-      return packager.build()
-        .then(() => {
-          if (platform === "darwin") {
-            const packedAppDir = projectDir + "/dist/TestApp-darwin-x64/TestApp.app"
-            const info = plist.parse(fs.readFileSync(packedAppDir + "/Contents/Info.plist", "utf8"));
-            assertThat(info).have.properties({
-              CFBundleDisplayName: "TestApp",
-              CFBundleIdentifier: "your.id",
-              LSApplicationCategoryType: "your.app.category.type",
-              CFBundleVersion: "1.0.0"
-            })
-
-            return util.exec("codesign", ["--verify", packedAppDir])
-              .then(it => assertThat(it[0].toString()).not.match(/is not signed at all/))
-          }
-        })
+  await deleteDirectory(path.join(projectDir, "dist"))
+  await packager.build()
+  if (platform === "darwin") {
+    const packedAppDir = projectDir + "/dist/TestApp-darwin-x64/TestApp.app"
+    const info = parsePlist(await readFile(packedAppDir + "/Contents/Info.plist", "utf8"))
+    assertThat(info).has.properties({
+      CFBundleDisplayName: "TestApp",
+      CFBundleIdentifier: "your.id",
+      LSApplicationCategoryType: "your.app.category.type",
+      CFBundleVersion: "1.0.0"
     })
+
+    const result = await exec("codesign", ["--verify", packedAppDir])
+    assertThat(result[0].toString()).not.match(/is not signed at all/)
+  }
 }
 
-describe("Build", function () {
-  // default 2 seconds is not enough
-  this.timeout(4 * 60 * 1000)
-
-  it("pack two-package.json project", function () {
-    return assertPack(path.join(__dirname, "test-app"))
+if (!process.env.APPVEYOR) {
+  test("pack two-package.json project", async function (t) {
+    await assertPack(t, path.join(__dirname, "test-app"), "darwin")
   })
 
-  it("pack one-package.json project", function () {
-    return assertPack(path.join(__dirname, "test-app-one"))
+  test("pack one-package.json project", async function (t) {
+    await assertPack(t, path.join(__dirname, "test-app-one"), "darwin")
   })
+}
 
-
-  it("pack two-package.json project win", function () {
-    return assertPack(path.join(__dirname, "test-app"), "win32")
+if (!process.env.TRAVIS) {
+  test("pack two-package.json project win", async function (t) {
+    assertPack(t, path.join(__dirname, "test-app"), "win32")
   })
-})
+}

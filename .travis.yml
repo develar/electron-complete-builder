@@ -13,12 +13,6 @@ cache:
     - /Library/Caches/Homebrew
     - /usr/local/Library
 
-before_install:
-  - brew update
-  - brew install Caskroom/cask/xquartz
-  - brew install wine
-  - brew install mono
-
 install:
 - rm -rf ~/.nvm
 - git clone https://github.com/creationix/nvm.git ~/.nvm

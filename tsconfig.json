@@ -23,6 +23,7 @@
     "typings/bluebird.d.ts",
     "typings/command-line-args.d.ts",
     "typings/electron-packager/electron-packager.d.ts",
+    "typings/fs-extra/fs-extra.d.ts",
     "typings/gh-api.d.ts",
     "typings/hosted-git-info.d.ts",
     "typings/json-parse-helpfulerror.d.ts",
@@ -43,6 +44,7 @@
     "src/packager.ts",
     "src/promise.ts",
     "src/promisifed-fs.ts",
+    "src/repositoryInfo.ts",
     "src/util.ts"
   ]
 }

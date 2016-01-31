@@ -7,6 +7,7 @@ import { all, executeFinally } from "./promise"
 import { EventEmitter } from "events"
 import { Promise as BluebirdPromise } from "bluebird"
 import { tsAwaiter } from "./awaiter"
+import { MetadataProvider, AppMetadata, DevMetadata, InfoRetriever, DevBuildMetadata } from "./repositoryInfo"
 import packager = require("electron-packager")
 
 const __awaiter = tsAwaiter
@@ -28,38 +29,6 @@ export interface PackagerOptions {
   cscKeyPassword?: string
 }
 
-interface RepositoryInfo {
-  url: string
-}
-
-interface Metadata {
-  repository: string | RepositoryInfo
-}
-
-interface DevMetadata extends Metadata {
-  build: DevBuildMetadata
-}
-
-interface DevBuildMetadata {
-  osx: appdmg.Specification
-  win: any
-}
-
-interface AppMetadata extends Metadata {
-  version: string
-  name: string
-  description: string
-  author: string
-
-  build: BuildMetadata
-
-  windowsPackager: any
-}
-
-interface BuildMetadata {
-  iconUrl: string
-}
-
 function addHandler(emitter: EventEmitter, event: string, handler: Function) {
   emitter.on(event, handler)
 }
@@ -73,15 +42,15 @@ export function setDefaultOptionValues(options: PackagerOptions) {
   }
 }
 
-export class Packager {
+export class Packager implements MetadataProvider {
   private projectDir: string
 
   private appDir: string
 
   private outDir: string
 
-  public metadata: AppMetadata
-  public devMetadata: DevMetadata
+  metadata: AppMetadata
+  devMetadata: DevMetadata
 
   private isTwoPackageJsonProjectLayoutUsed = true
 
@@ -89,7 +58,7 @@ export class Packager {
 
   private eventEmitter = new EventEmitter()
 
-  constructor(private options?: PackagerOptions) {
+  constructor(private options?: PackagerOptions, private repositoryInfo: InfoRetriever = null) {
     setDefaultOptionValues(options || {})
 
     this.projectDir = options.projectDir == null ? process.cwd() : path.resolve(options.projectDir)
@@ -109,7 +78,7 @@ export class Packager {
     return this.options.platform === "darwin"
   }
 
-  public get devPackageFile(): string {
+  get devPackageFile(): string {
     return path.join(this.projectDir, "package.json")
   }
 
@@ -306,86 +275,103 @@ export class Packager {
       .thenReturn(this.outDir + "/" + resultPath)
   }
 
-  private packageInDistributableFormat(arch: string, distPath: string): Promise<any> {
+  private async packageInDistributableFormat(arch: string, distPath: string): Promise<any> {
     const buildMetadata = this.devMetadata.build
-    const appName = this.metadata.name
-    const outputDirectory = this.outDir + "-installer"
-    const version = this.metadata.version
     if (this.options.platform === "win32") {
-      const customOptions = buildMetadata == null ? null : buildMetadata.win
-      let iconUrl = this.metadata.build.iconUrl
-      if (iconUrl == null || iconUrl.length === 0) {
-        if (customOptions != null) {
-          iconUrl = customOptions.iconUrl
+      return this.packageWinInDistributableFormat(buildMetadata, arch)
+    }
+    else {
+      return this.packageMacInDistributableFormat(buildMetadata, distPath)
+    }
+  }
+
+  private async packageWinInDistributableFormat(buildMetadata: DevBuildMetadata, arch: string): Promise<any> {
+    const customOptions = buildMetadata == null ? null : buildMetadata.win
+    let iconUrl = this.metadata.build.iconUrl
+    if (!iconUrl) {
+      if (customOptions != null) {
+        iconUrl = customOptions.iconUrl
+      }
+      if (!iconUrl) {
+        if (this.repositoryInfo != null) {
+          const info = await this.repositoryInfo.getInfo(this)
+          if (info != null) {
+            iconUrl = `https://raw.githubusercontent.com/${info.user}/${info.project}/master/build/icon.ico`
+          }
         }
-        if (iconUrl == null || iconUrl.length === 0) {
+
+        if (!iconUrl) {
           throw new Error("iconUrl is not specified, please see https://github.com/develar/electron-complete-builder#in-short")
         }
       }
-
-      return new BluebirdPromise<any>((resolve, reject) => {
-        require("electron-winstaller-temp-fork").build(Object.assign({
-          name: this.metadata.name,
-          appDirectory: this.outDir,
-          outputDirectory: outputDirectory,
-          productName: this.metadata.name,
-          version: version,
-          description: this.metadata.description,
-          authors: this.metadata.author,
-          iconUrl: iconUrl,
-          setupIcon: path.join(this.projectDir, "build", "icon.ico"),
-        }, customOptions), (error: Error) => error == null ? resolve(null) : reject(error))
-      })
-        .then(() => {
-          const archSuffix = (arch === "x64") ? "-x64" : ""
-          return Promise.all([
-            renameFile(path.join(outputDirectory, appName + "Setup.exe"), path.join(outputDirectory, appName + "Setup-" + version + archSuffix + ".exe"))
-              .then(it => this.dispatchArtifactCreated(it)),
-            renameFile(path.join(outputDirectory, appName + "-" + version + "-full.nupkg"), path.join(outputDirectory, appName + "-" + version + archSuffix + "-full.nupkg"))
-              .then(it => this.dispatchArtifactCreated(it))
-          ])
-        })
     }
-    else {
-      const artifactPath = path.join(this.outDir, this.metadata.name + "-" + this.metadata.version + ".dmg")
-      return new BluebirdPromise<any>((resolve, reject) => {
-        log("Creating DMG")
 
-        const specification: appdmg.Specification = {
-          title: this.metadata.name,
-          icon: "build/icon.icns",
-          "icon-size": 80,
-          background: "build/background.png",
-          contents: [
-            {
-              "x": 410, "y": 220, "type": "link", "path": "/Applications"
-            },
-            {
-              "x": 130, "y": 220, "type": "file"
-            }
-          ]
-        }
-
-        if (buildMetadata != null && buildMetadata.osx != null) {
-          Object.assign(specification, buildMetadata.osx)
-        }
-
-        if (specification.title == null) {
-          specification.title = this.metadata.name
-        }
-
-        specification.contents[1].path = distPath
-
-        const appDmg = require("appdmg")
-        const emitter = appDmg({
-          target: artifactPath,
-          basepath: this.projectDir,
-          specification: specification
-        })
-        emitter.on("error", reject)
-        emitter.on("finish", () => resolve())
+    const version = this.metadata.version
+    const outputDirectory = this.outDir + "-installer"
+    return new BluebirdPromise<any>((resolve, reject) => {
+      require("electron-winstaller-temp-fork").build(Object.assign({
+        name: this.metadata.name,
+        appDirectory: this.outDir,
+        outputDirectory: outputDirectory,
+        productName: this.metadata.name,
+        version: version,
+        description: this.metadata.description,
+        authors: this.metadata.author,
+        iconUrl: iconUrl,
+        setupIcon: path.join(this.projectDir, "build", "icon.ico"),
+      }, customOptions), (error: Error) => error == null ? resolve(null) : reject(error))
+    })
+      .then(() => {
+        const appName = this.metadata.name
+        const archSuffix = (arch === "x64") ? "-x64" : ""
+        return Promise.all([
+          renameFile(path.join(outputDirectory, appName + "Setup.exe"), path.join(outputDirectory, appName + "Setup-" + version + archSuffix + ".exe"))
+            .then(it => this.dispatchArtifactCreated(it)),
+          renameFile(path.join(outputDirectory, appName + "-" + version + "-full.nupkg"), path.join(outputDirectory, appName + "-" + version + archSuffix + "-full.nupkg"))
+            .then(it => this.dispatchArtifactCreated(it))
+        ])
       })
-        .then(() => this.dispatchArtifactCreated(artifactPath))
-    }
+  }
+
+  private packageMacInDistributableFormat(buildMetadata: DevBuildMetadata, distPath: string): Promise<any> {
+    const artifactPath = path.join(this.outDir, this.metadata.name + "-" + this.metadata.version + ".dmg")
+    return new BluebirdPromise<any>((resolve, reject) => {
+      log("Creating DMG")
+
+      const specification: appdmg.Specification = {
+        title: this.metadata.name,
+        icon: "build/icon.icns",
+        "icon-size": 80,
+        background: "build/background.png",
+        contents: [
+          {
+            "x": 410, "y": 220, "type": "link", "path": "/Applications"
+          },
+          {
+            "x": 130, "y": 220, "type": "file"
+          }
+        ]
+      }
+
+      if (buildMetadata != null && buildMetadata.osx != null) {
+        Object.assign(specification, buildMetadata.osx)
+      }
+
+      if (specification.title == null) {
+        specification.title = this.metadata.name
+      }
+
+      specification.contents[1].path = distPath
+
+      const appDmg = require("appdmg")
+      const emitter = appDmg({
+        target: artifactPath,
+        basepath: this.projectDir,
+        specification: specification
+      })
+      emitter.on("error", reject)
+      emitter.on("finish", () => resolve())
+    })
+      .then(() => this.dispatchArtifactCreated(artifactPath))
   }
 }
