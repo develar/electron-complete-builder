@@ -2,7 +2,6 @@ import assertThat from "should/as-function"
 import test from "ava"
 import { GitHubPublisher } from "../out/gitHubPublisher"
 import { join } from "path"
-import { executeFinally } from "../out/promise"
 
 function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -20,17 +19,23 @@ const iconPath = join(__dirname, "test-app", "build", "icon.icns")
 //    .releasePromise, /(Bad credentials|Unauthorized|API rate limit exceeded)/)
 //})
 
-test("GitHub upload", async function() {
+test("GitHub upload", async function () {
   const publisher = new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), token)
-  await executeFinally(
-    publisher.upload(iconPath),
-    () => publisher.deleteRelease())
+  try {
+    await publisher.upload(iconPath)
+  }
+  finally {
+    await publisher.deleteRelease()
+  }
 })
 
-test("GitHub overwrite on upload", async () => {
+test("GitHub overwrite on upload", async() => {
   const publisher = new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), token)
-  await executeFinally(
-    publisher.upload(iconPath)
-      .then(() => publisher.upload(iconPath)),
-    () => publisher.deleteRelease())
+  try {
+    await publisher.upload(iconPath)
+    await publisher.upload(iconPath)
+  }
+  finally {
+    await publisher.deleteRelease()
+  }
 })
