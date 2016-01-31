@@ -1,5 +1,6 @@
-import assertThat from "should/as-function";
-import test from "ava";
+import { createKeychain, deleteKeychain, generateKeychainName } from "../out/codeSign"
+import assertThat from "should/as-function"
+import test from "ava"
 const codeSignData = require("./codeSignData")
 const promises = require("../out/promise")
 

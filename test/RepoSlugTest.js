@@ -1,5 +1,6 @@
-import assertThat from "should/as-function";
-import test from "ava";
+import { InfoRetriever } from "../out/repositoryInfo"
+import assertThat from "should/as-function"
+import test from "ava"
 
 test("repo slug from TRAVIS_REPO_SLUG", function () {
   const oldValue = process.env.TRAVIS_REPO_SLUG

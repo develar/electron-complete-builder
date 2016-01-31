@@ -1,5 +1,8 @@
-import test from "ava";
-import {join} from "path";
+import assertThat from "should/as-function"
+import test from "ava"
+import { GitHubPublisher } from "../out/gitHubPublisher"
+import { join } from "path"
+import { executeFinally } from "../out/promise"
 
 function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;

@@ -1,10 +1,14 @@
-import test from "ava";
-import fse from "fs-extra";
-import tmp from "tmp";
-import Promise from "bluebird";
-import assertThat from "should/as-function";
-import * as path from "path";
-import {parse as parsePlist} from "plist";
+import test from "ava"
+import fse from "fs-extra"
+import tmp from "tmp"
+import Promise from "bluebird"
+import assertThat from "should/as-function"
+import * as path from "path"
+import { parse as parsePlist } from "plist"
+import { Packager } from "../out/packager"
+import { exec } from "../out/util"
+import { deleteDirectory, readFile } from "../out/promisifed-fs"
+import { CSC_LINK, CSC_KEY_PASSWORD } from "./codeSignData"
 
 const copyDir = Promise.promisify(fse.copy)
 const tmpDir = Promise.promisify(tmp.dir)
