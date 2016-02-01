@@ -12,7 +12,7 @@
     "lint": "tslint src/*",
     "pretest": "npm run lint",
     "test": "ava",
-    "release": "npm prune && npm run compile && npm publish",
+    "release": "npm prune && npm run compile && npm run test && npm publish",
     "preversion": "npm prune && npm run compile && npm run test"
   },
   "dependencies": {
