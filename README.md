@@ -115,4 +115,4 @@ Hint: You don't need a windows machine to build windows artifacts — use [AppVe
 
 
 # Build Version Management
-`CFBundleVersion` (OS X) and `FileVersion` (Windows) will be set automatically to `version`.`build_number` on CI server (Travis and AppVeyor supported).
+`CFBundleVersion` (OS X) and `FileVersion` (Windows) will be set automatically to `version`.`build_number` on CI server (Travis, AppVeyor and CircleCI supported).

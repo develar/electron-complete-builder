@@ -92,12 +92,12 @@ async function getInfo(provider: MetadataProvider): Promise<RepositorySlug> {
   if (repo == null) {
     let url = process.env.TRAVIS_REPO_SLUG
     if (url == null) {
-      const appveyorAccountName: string = process.env.APPVEYOR_ACCOUNT_NAME
-      const appveyorProjectName: string = process.env.APPVEYOR_PROJECT_NAME
-      if (appveyorAccountName != null && appveyorProjectName != null) {
+      const user: string = process.env.APPVEYOR_ACCOUNT_NAME || process.env.CIRCLE_PROJECT_USERNAME
+      const project: string = process.env.APPVEYOR_PROJECT_NAME || process.env.CIRCLE_PROJECT_REPONAME
+      if (user != null && project != null) {
         return {
-          user: appveyorAccountName,
-          project: appveyorProjectName,
+          user: user,
+          project: project,
         }
       }
 

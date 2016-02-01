@@ -20,7 +20,7 @@ export interface Publisher {
 }
 
 export interface PublishOptions {
-  publish?: "onTag" | "onTagOrDraft" | "always"
+  publish?: "onTag" | "onTagOrDraft" | "always" | "never"
   githubToken?: string
 }
 

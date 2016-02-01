@@ -228,7 +228,7 @@ export class Packager implements MetadataProvider {
     return new BluebirdPromise((resolve, reject) => {
       const version = this.metadata.version
       let buildVersion = version
-      const buildNumber = process.env.TRAVIS_BUILD_NUMBER || process.env.APPVEYOR_BUILD_NUMBER
+      const buildNumber = process.env.TRAVIS_BUILD_NUMBER || process.env.APPVEYOR_BUILD_NUMBER || process.env.CIRCLE_BUILD_NUM
       if (buildNumber != null) {
         buildVersion += "." + buildNumber
       }

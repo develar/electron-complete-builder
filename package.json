@@ -1,7 +1,7 @@
 {
   "name": "electron-complete-builder",
   "description": "Complete solution to build ready for distribution and 'auto update' installers of your Electron App",
-  "version": "0.5.0-beta.10",
+  "version": "0.5.0",
   "license": "MIT",
   "bin": {
     "install-app-deps": "./out/install-app-deps.js",
@@ -12,7 +12,7 @@
     "lint": "tslint src/*",
     "pretest": "npm run lint",
     "test": "ava",
-    "release": "npm prune && npm run compile && npm run test && npm publish",
+    "release": "npm prune && npm run compile && npm publish",
     "preversion": "npm prune && npm run compile && npm run test"
   },
   "dependencies": {

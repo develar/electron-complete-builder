@@ -54,14 +54,14 @@ export function build(options: BuildOptions = {}): Promise<any> {
       options.publish = "always"
     }
     else {
-      const message = "so artifacts will be published if draft release exists"
-      if (process.env.TRAVIS_TAG != null) {
-        log("Env TRAVIS_TAG is set, " + message)
-        options.publish = "onTagOrDraft"
+      const tag = process.env.TRAVIS_TAG || process.env.APPVEYOR_REPO_TAG_NAME || process.env.CIRCLE_TAG
+      if (tag != null && tag.length !== 0) {
+        log("Tag %s is defined, so artifacts will be published", tag)
+        options.publish = "onTag"
         isPublishOptionGuessed = true
       }
-      else if (process.env.APPVEYOR_REPO_TAG === true || process.env.APPVEYOR_REPO_TAG === "true") {
-        log("Env APPVEYOR_REPO_TAG is set to true, " + message)
+      else if ((process.env.TRAVIS || process.env.APPVEYOR || process.env.CIRCLECI || "").toLowerCase() === "true") {
+        log("CI detected, so artifacts will be published if draft release exists")
         options.publish = "onTagOrDraft"
         isPublishOptionGuessed = true
       }
@@ -71,7 +71,7 @@ export function build(options: BuildOptions = {}): Promise<any> {
   const publishTasks: Array<BluebirdPromise<any>> = []
   const repositoryInfo = new InfoRetriever()
   const packager = new Packager(options, repositoryInfo)
-  if (options.publish != null) {
+  if (options.publish != null && options.publish !== "never") {
     let publisher: BluebirdPromise<Publisher> = null
     packager.artifactCreated(path => {
       if (publisher == null) {

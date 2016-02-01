@@ -1,14 +1,10 @@
-import test from "ava-tf"
-import fse from "fs-extra"
-import tmp from "tmp"
-import Promise from "bluebird"
-import assertThat from "should/as-function"
-import * as path from "path"
-import { parse as parsePlist } from "plist"
-import { Packager } from "../out/packager"
-import { exec } from "../out/util"
-import { deleteDirectory, readFile } from "../out/promisifed-fs"
-import { CSC_LINK, CSC_KEY_PASSWORD } from "./codeSignData"
+import test from "ava-tf";
+import fse from "fs-extra";
+import tmp from "tmp";
+import Promise from "bluebird";
+import assertThat from "should/as-function";
+import * as path from "path";
+import { parse as parsePlist } from "plist";
 
 const copyDir = Promise.promisify(fse.copy)
 const tmpDir = Promise.promisify(tmp.dir)
@@ -47,7 +43,7 @@ async function assertPack(assert, projectDir, platform) {
       CFBundleDisplayName: "TestApp",
       CFBundleIdentifier: "your.id",
       LSApplicationCategoryType: "your.app.category.type",
-      CFBundleVersion: "1.0.0" + "." + process.env.TRAVIS_BUILD_NUMBER
+      CFBundleVersion: "1.0.0" + "." + (process.env.TRAVIS_BUILD_NUMBER || process.env.CIRCLE_BUILD_NUM)
     })
 
     const result = await exec("codesign", ["--verify", packedAppDir])
@@ -56,8 +52,9 @@ async function assertPack(assert, projectDir, platform) {
 }
 
 if (!process.env.APPVEYOR) {
-  if (process.env.TRAVIS_BUILD_NUMBER == null) {
-    process.env.TRAVIS_BUILD_NUMBER = 42
+  if (process.env.TRAVIS !== "true") {
+    // we don't use CircleCI, so, we can safely set this env
+    process.env.CIRCLE_BUILD_NUM = 42
   }
 
   test("pack two-package.json project", async t => {

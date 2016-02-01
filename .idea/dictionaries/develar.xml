@@ -4,6 +4,7 @@
       <w>appveyor</w>
       <w>archs</w>
       <w>awaiter</w>
+      <w>circleci</w>
       <w>clcerts</w>
       <w>coroutine</w>
       <w>crypto</w>
@@ -22,6 +23,7 @@
       <w>repos</w>
       <w>rimraf</w>
       <w>tsconfig</w>
+      <w>veyor</w>
       <w>winstaller</w>
     </words>
   </dictionary>
