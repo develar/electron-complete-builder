@@ -1,4 +1,4 @@
-Complete solution to build ready for distribution and "auto update" installers of your app for OS X and Windows (Linux can be supported too).
+Complete solution to build ready for distribution and "auto update" installers of your app for OS X and Windows (Linux support (rpm) in progress).
 
 * [Native application dependencies](http://electron.atom.io/docs/latest/tutorial/using-native-node-modules/) compilation (only if two-package.json project layout used).
 * [Auto Update](#auto-update) ready application packaging.

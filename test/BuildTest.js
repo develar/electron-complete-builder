@@ -61,17 +61,21 @@ if (!process.env.APPVEYOR) {
     process.env.CIRCLE_BUILD_NUM = 42
   }
 
-  test("pack two-package.json project", async t => {
+  test("two-package.json project", async t => {
     await assertPack(t, path.join(__dirname, "test-app"), "darwin")
   })
 
-  test("pack one-package.json project", async t => {
+  test("one-package.json project", async t => {
     await assertPack(t, path.join(__dirname, "test-app-one"), "darwin")
+  })
+
+  test("linux two-package.json project", async t => {
+    await assertPack(t, path.join(__dirname, "test-app"), "linux")
   })
 }
 
 if (!process.env.TRAVIS) {
-  test("pack two-package.json project win", async t => {
+  test("two-package.json project win", async t => {
     await assertPack(t, path.join(__dirname, "test-app"), "win32")
   })
 }

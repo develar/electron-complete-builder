@@ -136,7 +136,7 @@ export class Packager implements MetadataProvider {
         await this.pack(arch)
       }
 
-      if (this.options.dist) {
+      if (this.options.dist && this.options.platform !== "linux") {
         const distPromise = this.packageInDistributableFormat(arch, distPath)
         if (isMac) {
           await BluebirdPromise.all([
