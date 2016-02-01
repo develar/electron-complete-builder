@@ -32,6 +32,7 @@
     "typings/progress-stream.d.ts",
     "typings/progress/progress.d.ts",
     "typings/rimraf/rimraf.d.ts",
+    "typings/should/should.d.ts",
     "typings/source-map-support/source-map-support.d.ts",
     "src/awaiter.ts",
     "src/build-cli.ts",

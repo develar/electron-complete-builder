@@ -9,15 +9,14 @@ cache:
     - test/testApp/node_modules
     - $HOME/.electron
     - $HOME/.npm
-    - /usr/local/Cellar
-    - /Library/Caches/Homebrew
-    - /usr/local/Library
 
 install:
 - rm -rf ~/.nvm
 - git clone https://github.com/creationix/nvm.git ~/.nvm
 - source ~/.nvm/nvm.sh
 - nvm install 5
+- npm install npm -g
+- npm -v
 - npm prune
 - npm install
 - npm run compile

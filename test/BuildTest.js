@@ -1,4 +1,4 @@
-import test from "ava"
+import test from "ava-tf"
 import fse from "fs-extra"
 import tmp from "tmp"
 import Promise from "bluebird"
@@ -33,7 +33,12 @@ async function assertPack(assert, projectDir, platform) {
     dist: true,
     platform: platform,
   })
-  await deleteDirectory(path.join(projectDir, "dist"))
+
+  // for win we always use temp dir, so, don't need to clean
+  if (platform !== "win32") {
+    await deleteDirectory(path.join(projectDir, "dist"))
+  }
+
   await packager.build()
   if (platform === "darwin") {
     const packedAppDir = projectDir + "/dist/TestApp-darwin-x64/TestApp.app"
@@ -42,7 +47,7 @@ async function assertPack(assert, projectDir, platform) {
       CFBundleDisplayName: "TestApp",
       CFBundleIdentifier: "your.id",
       LSApplicationCategoryType: "your.app.category.type",
-      CFBundleVersion: "1.0.0"
+      CFBundleVersion: "1.0.0" + "." + process.env.TRAVIS_BUILD_NUMBER
     })
 
     const result = await exec("codesign", ["--verify", packedAppDir])
@@ -51,17 +56,21 @@ async function assertPack(assert, projectDir, platform) {
 }
 
 if (!process.env.APPVEYOR) {
-  test("pack two-package.json project", async function (t) {
+  if (process.env.TRAVIS_BUILD_NUMBER == null) {
+    process.env.TRAVIS_BUILD_NUMBER = 42
+  }
+
+  test("pack two-package.json project", async t => {
     await assertPack(t, path.join(__dirname, "test-app"), "darwin")
   })
 
-  test("pack one-package.json project", async function (t) {
+  test("pack one-package.json project", async t => {
     await assertPack(t, path.join(__dirname, "test-app-one"), "darwin")
   })
 }
 
 if (!process.env.TRAVIS) {
-  test("pack two-package.json project win", async function (t) {
-    assertPack(t, path.join(__dirname, "test-app"), "win32")
+  test("pack two-package.json project win", async t => {
+    await assertPack(t, path.join(__dirname, "test-app"), "win32")
   })
 }

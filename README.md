@@ -3,6 +3,7 @@ Complete solution to build ready for distribution and "auto update" installers o
 * [Native application dependencies](http://electron.atom.io/docs/latest/tutorial/using-native-node-modules/) compilation (only if two-package.json project layout used).
 * [Auto Update](#auto-update) ready application packaging.
 * [Code Signing](#code-signing) on a CI server or development machine.
+* [Build version management](#build-version-management).
 
 [electron-packager](https://github.com/maxogden/electron-packager),
 [appdmg](https://github.com/LinusU/node-appdmg) and
@@ -21,12 +22,10 @@ Real project example — [onshape-desktop-shell](https://github.com/develar/onsh
   "build": {
     "app-bundle-id": "your.id",
     "app-category-type": "your.app.category.type",
-    "iconUrl": "(windows only) A URL to an ICO file to use as the application icon"
+    "iconUrl": "(windows only) A URL to an ICO file to use as the application icon, see details below"
   }
   ```
   This object will be used as source of [electron-packager](https://www.npmjs.com/package/electron-packager) options. You can specify any other options here.
-
-  Please note — [local icon file url is not accepted](https://github.com/atom/grunt-electron-installer/issues/73), must be https/http. If you don't plan to build windows installer, you can omit it.
 
 2. Create directory `build` in the root of the project and put your `background.png` (OS X DMG background), `icon.icns` (OS X app icon) and `icon.ico` (Windows app icon).
 
@@ -40,6 +39,11 @@ Real project example — [onshape-desktop-shell](https://github.com/develar/onsh
     ```
 
     And then you can run `npm run pack` or `npm run dist` (to package in a distributable format (e.g. DMG, windows installer, NuGet package)).
+
+## iconUrl
+Please note — [local icon file url is not accepted](https://github.com/atom/grunt-electron-installer/issues/73), must be https/http.
+* If you don't plan to build windows installer, you can omit it.
+* If your project repository is public on GitHub, it will be `https://raw.githubusercontent.com/${info.user}/${info.project}/master/build/icon.ico` by default.
 
 ## Distributable Format Configuration
 In the development `package.json` custom `build` field can be specified to customize distributable format:
@@ -108,3 +112,7 @@ Windows code signing is not yet supported in a smart way, you need to pass corre
 
 # Windows
 Hint: You don't need a windows machine to build windows artifacts — use [AppVeyor](http://www.appveyor.com/). See  [sample appveyor.yml to build Electron app on windows](https://github.com/develar/onshape-desktop-shell/blob/master/appveyor.yml).
+
+
+# Build Version Management
+`CFBundleVersion` (OS X) and `FileVersion` (Windows) will be set automatically to `version`.`build_number` on CI server (Travis and AppVeyor supported).

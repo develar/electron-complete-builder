@@ -226,6 +226,13 @@ export class Packager implements MetadataProvider {
 
   private pack(arch: string) {
     return new BluebirdPromise((resolve, reject) => {
+      const version = this.metadata.version
+      let buildVersion = version
+      const buildNumber = process.env.TRAVIS_BUILD_NUMBER || process.env.APPVEYOR_BUILD_NUMBER
+      if (buildNumber != null) {
+        buildVersion += "." + buildNumber
+      }
+
       const options = Object.assign({
         dir: this.appDir,
         out: path.dirname(this.outDir),
@@ -235,13 +242,13 @@ export class Packager implements MetadataProvider {
         version: this.electronVersion,
         icon: path.join(this.projectDir, "build", "icon"),
         asar: true,
-        "app-version": this.metadata.version,
-        "build-version": this.metadata.version,
+        "app-version": version,
+        "build-version": buildVersion,
         "version-string": {
           CompanyName: this.metadata.author,
           FileDescription: this.metadata.description,
-          FileVersion: this.metadata.version,
-          ProductVersion: this.metadata.version,
+          ProductVersion: version,
+          FileVersion: buildVersion,
           ProductName: this.metadata.name,
           InternalName: this.metadata.name,
         }

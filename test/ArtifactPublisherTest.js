@@ -1,5 +1,5 @@
 import assertThat from "should/as-function"
-import test from "ava"
+import test from "ava-tf"
 import { GitHubPublisher } from "../out/gitHubPublisher"
 import { join } from "path"
 

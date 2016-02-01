@@ -2,31 +2,12 @@
 <module type="WEB_MODULE" version="4">
   <component name="NewModuleRootManager" inherit-compiler-output="false">
     <content url="file://$MODULE_DIR$">
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/.cache" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-code-frame" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-core/node_modules" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-generator" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-helper-call-delegate" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-helper-get-function-arity" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-helper-hoist-variables" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-helpers" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-messages" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-plugin-transform-es2015-parameters" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-runtime" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-template" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-traverse" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babel-types" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/babylon" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron-packager" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/ts-babel" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/tslint" />
-      <excludeFolder url="file://$MODULE_DIR$/node_modules/typescript" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules" />
       <excludeFolder url="file://$MODULE_DIR$/test/test-app-one/dist" />
       <excludeFolder url="file://$MODULE_DIR$/test/test-app/app/node_modules" />
       <excludeFolder url="file://$MODULE_DIR$/test/test-app/dist" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="electron-complete-builder node_modules" level="project" />
   </component>
 </module>
