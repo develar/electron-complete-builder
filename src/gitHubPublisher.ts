@@ -1,4 +1,4 @@
-import { GetReleaseResult, Release, Asset } from "gh-release"
+import { Release, Asset } from "gh-release"
 import { log } from "./util"
 import { basename } from "path"
 import { parse as parseUrl } from "url"
@@ -20,7 +20,7 @@ export interface Publisher {
 }
 
 export interface PublishOptions {
-  publish?: boolean
+  publish?: "onTag" | "onTagOrDraft" | "always"
   githubToken?: string
 }
 
@@ -28,11 +28,11 @@ export class GitHubPublisher implements Publisher {
   private tag: string
   private _releasePromise: BluebirdPromise<Release>
 
-  public get releasePromise(): Promise<Release> {
+  get releasePromise(): Promise<Release> {
     return this._releasePromise
   }
 
-  constructor(private owner: string, private repo: string, version: string, private token: string) {
+  constructor(private owner: string, private repo: string, version: string, private token: string, private createReleaseIfNotExists: boolean = true) {
     if (token == null || token.length === 0) {
       throw new Error("GitHub Personal Access Token is not specified")
     }
@@ -41,25 +41,39 @@ export class GitHubPublisher implements Publisher {
     this._releasePromise = <BluebirdPromise<Release>>this.init()
   }
 
-  private async init(): Promise<GetReleaseResult> {
+  private async init(): Promise<Release> {
     // we don't use "Get a release by tag name" because "tag name" means existing git tag, but we draft release and don't create git tag
     let releases = await gitHubRequest<Array<Release>>(`/repos/${this.owner}/${this.repo}/releases`, this.token)
     for (let release of releases) {
       if (release.tag_name === this.tag) {
         if (!release.draft) {
-          throw new Error("Release must be a draft")
+          if (this.createReleaseIfNotExists) {
+            throw new Error("Release must be a draft")
+          }
+          else {
+            return null
+          }
         }
         return release
       }
     }
 
-    log("Release %s doesn't exists, creating one", this.tag)
-    return this.createRelease()
+    if (this.createReleaseIfNotExists) {
+      log("Release %s doesn't exists, creating one", this.tag)
+      return this.createRelease()
+    }
+    else {
+      return null
+    }
   }
 
   async upload(path: string): Promise<void> {
     const fileName = basename(path)
     const release = await this.releasePromise
+    if (release == null) {
+      return null
+    }
+
     const parsedUrl = parseUrl(release.upload_url.substring(0, release.upload_url.indexOf("{")) + "?name=" + fileName)
     const fileStat = await stat(path)
     uploadAttempt: for (let i = 0; i < 3; i++) {

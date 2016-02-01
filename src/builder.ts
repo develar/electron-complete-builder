@@ -9,14 +9,18 @@ import { log } from "./util"
 const __awaiter = tsAwaiter
 Array.isArray(__awaiter)
 
-export async function createPublisher(packager: Packager, options: BuildOptions, repositoryInfo: InfoRetriever): Promise<Publisher> {
-  const info = await repositoryInfo.getInfo(packager)
+export async function createPublisher(packager: Packager, options: BuildOptions, repoSlug: InfoRetriever, isPublishOptionGuessed: boolean = false): Promise<Publisher> {
+  const info = await repoSlug.getInfo(packager)
   if (info == null) {
+    if (isPublishOptionGuessed) {
+      return null
+    }
+
     log("Cannot detect repository by .git/config")
     throw new Error("Please specify 'repository' in the dev package.json ('" + packager.devPackageFile + "')")
   }
   else {
-    return new GitHubPublisher(info.user, info.project, packager.metadata.version, options.githubToken)
+    return new GitHubPublisher(info.user, info.project, packager.metadata.version, options.githubToken, options.publish !== "onTagOrDraft")
   }
 }
 
@@ -35,18 +39,43 @@ export function build(options: BuildOptions = {}): Promise<any> {
     options.githubToken = process.env.GH_TOKEN || process.env.GH_TEST_TOKEN
   }
 
+  const lifecycleEvent = process.env.npm_lifecycle_event
+  if (options.dist === undefined) {
+    options.dist = lifecycleEvent === "dist" || lifecycleEvent === "build"
+  }
+
   if (options.publish) {
     options.dist = true
+  }
+
+  let isPublishOptionGuessed = false
+  if (options.publish === undefined) {
+    if (lifecycleEvent === "release") {
+      options.publish = "always"
+    }
+    else {
+      const message = "so artifacts will be published if draft release exists"
+      if (process.env.TRAVIS_TAG != null) {
+        log("Env TRAVIS_TAG is set, " + message)
+        options.publish = "onTagOrDraft"
+        isPublishOptionGuessed = true
+      }
+      else if (process.env.APPVEYOR_REPO_TAG === true || process.env.APPVEYOR_REPO_TAG === "true") {
+        log("Env APPVEYOR_REPO_TAG is set to true, " + message)
+        options.publish = "onTagOrDraft"
+        isPublishOptionGuessed = true
+      }
+    }
   }
 
   const publishTasks: Array<BluebirdPromise<any>> = []
   const repositoryInfo = new InfoRetriever()
   const packager = new Packager(options, repositoryInfo)
-  if (options.publish) {
+  if (options.publish != null) {
     let publisher: BluebirdPromise<Publisher> = null
     packager.artifactCreated(path => {
       if (publisher == null) {
-        publisher = <BluebirdPromise<Publisher>>createPublisher(packager, options, repositoryInfo)
+        publisher = <BluebirdPromise<Publisher>>createPublisher(packager, options, repositoryInfo, isPublishOptionGuessed)
       }
 
       if (publisher != null) {
