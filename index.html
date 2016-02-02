@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>electron-complete-builder by develar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">electron-complete-builder</h1>
+      <h2 class="project-tagline">Complete solution to build ready for distribution and &quot;auto update&quot; installers of your app for OS X and Windows (Linux support (rpm) in progress).</h2>
+      <a href="https://github.com/develar/electron-complete-builder" class="btn">View on GitHub</a>
+      <a href="https://github.com/develar/electron-complete-builder/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/develar/electron-complete-builder/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <p>Complete solution to build ready for distribution and "auto update" installers of your app for OS X and Windows (Linux support (rpm) in progress).</p>
+
+<ul>
+<li>
+<a href="http://electron.atom.io/docs/latest/tutorial/using-native-node-modules/">Native application dependencies</a> compilation (only if two-package.json project layout used).</li>
+<li>
+<a href="#auto-update">Auto Update</a> ready application packaging.</li>
+<li>
+<a href="#code-signing">Code Signing</a> on a CI server or development machine.</li>
+<li>
+<a href="#build-version-management">Build version management</a>.</li>
+</ul>
+
+<p><a href="https://github.com/maxogden/electron-packager">electron-packager</a>,
+<a href="https://github.com/LinusU/node-appdmg">appdmg</a> and
+<a href="https://github.com/electronjs/windows-installer">windows-installer</a> are used under the hood.</p>
+
+<p>Real project example — <a href="https://github.com/develar/onshape-desktop-shell">onshape-desktop-shell</a>.</p>
+
+<h1>
+<a id="configuration" class="anchor" href="#configuration" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Configuration</h1>
+
+<h2>
+<a id="in-short" class="anchor" href="#in-short" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>In short</h2>
+
+<ol>
+<li>
+<p>Ensure that required fields are specified in the application <code>package.json</code>:</p>
+
+<p>Standard <code>name</code>, <code>description</code>, <code>version</code> and <code>author</code>.</p>
+
+<p>Custom <code>build</code> field must be specified:</p>
+
+<div class="highlight highlight-source-json"><pre><span class="pl-s"><span class="pl-pds">"</span>build<span class="pl-pds">"</span></span>: {
+  <span class="pl-s"><span class="pl-pds">"</span>app-bundle-id<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>your.id<span class="pl-pds">"</span></span>,
+  <span class="pl-s"><span class="pl-pds">"</span>app-category-type<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>your.app.category.type<span class="pl-pds">"</span></span>,
+  <span class="pl-s"><span class="pl-pds">"</span>iconUrl<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>(windows only) A URL to an ICO file to use as the application icon, see details below<span class="pl-pds">"</span></span>
+}</pre></div>
+
+<p>This object will be used as source of <a href="https://www.npmjs.com/package/electron-packager">electron-packager</a> options. You can specify any other options here.</p>
+</li>
+<li><p>Create directory <code>build</code> in the root of the project and put your <code>background.png</code> (OS X DMG background), <code>icon.icns</code> (OS X app icon) and <code>icon.ico</code> (Windows app icon).</p></li>
+<li>
+<p>Add <a href="https://docs.npmjs.com/cli/run-script">scripts</a> to the development <code>package.json</code>:</p>
+
+<div class="highlight highlight-source-json"><pre><span class="pl-s"><span class="pl-pds">"</span>scripts<span class="pl-pds">"</span></span> : {
+  <span class="pl-s"><span class="pl-pds">"</span>postinstall<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>install-app-deps<span class="pl-pds">"</span></span>,
+  <span class="pl-s"><span class="pl-pds">"</span>pack<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>build<span class="pl-pds">"</span></span>,
+  <span class="pl-s"><span class="pl-pds">"</span>dist<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>build --dist<span class="pl-pds">"</span></span>
+}</pre></div>
+
+<p>And then you can run <code>npm run pack</code> or <code>npm run dist</code> (to package in a distributable format (e.g. DMG, windows installer, NuGet package)).</p>
+</li>
+</ol>
+
+<h2>
+<a id="iconurl" class="anchor" href="#iconurl" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>iconUrl</h2>
+
+<p>Please note — <a href="https://github.com/atom/grunt-electron-installer/issues/73">local icon file url is not accepted</a>, must be https/http.</p>
+
+<ul>
+<li>If you don't plan to build windows installer, you can omit it.</li>
+<li>If your project repository is public on GitHub, it will be <code>https://raw.githubusercontent.com/${info.user}/${info.project}/master/build/icon.ico</code> by default.</li>
+</ul>
+
+<h2>
+<a id="distributable-format-configuration" class="anchor" href="#distributable-format-configuration" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Distributable Format Configuration</h2>
+
+<p>In the development <code>package.json</code> custom <code>build</code> field can be specified to customize distributable format:</p>
+
+<div class="highlight highlight-source-json"><pre><span class="pl-s"><span class="pl-pds">"</span>build<span class="pl-pds">"</span></span>: {
+  <span class="pl-s"><span class="pl-pds">"</span>osx<span class="pl-pds">"</span></span>: {
+    <span class="pl-s"><span class="pl-pds">"</span>title<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>computed name from app package.js, you can overwrite<span class="pl-pds">"</span></span>,
+    <span class="pl-s"><span class="pl-pds">"</span>icon<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>build/icon.icns<span class="pl-pds">"</span></span>,
+    <span class="pl-s"><span class="pl-pds">"</span>icon-size<span class="pl-pds">"</span></span>: <span class="pl-c1">80</span>,
+    <span class="pl-s"><span class="pl-pds">"</span>background<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>build/background.png<span class="pl-pds">"</span></span>,
+    <span class="pl-s"><span class="pl-pds">"</span>contents<span class="pl-pds">"</span></span>: [
+      {
+        <span class="pl-s"><span class="pl-pds">"</span>x<span class="pl-pds">"</span></span>: <span class="pl-c1">410</span>,
+        <span class="pl-s"><span class="pl-pds">"</span>y<span class="pl-pds">"</span></span>: <span class="pl-c1">220</span>,
+        <span class="pl-s"><span class="pl-pds">"</span>type<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>link<span class="pl-pds">"</span></span>,
+        <span class="pl-s"><span class="pl-pds">"</span>path<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>/Applications<span class="pl-pds">"</span></span>
+      },
+      {
+        <span class="pl-s"><span class="pl-pds">"</span>x<span class="pl-pds">"</span></span>: <span class="pl-c1">130</span>,
+        <span class="pl-s"><span class="pl-pds">"</span>y<span class="pl-pds">"</span></span>: <span class="pl-c1">220</span>,
+        <span class="pl-s"><span class="pl-pds">"</span>type<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>file<span class="pl-pds">"</span></span>,
+        <span class="pl-s"><span class="pl-pds">"</span>path<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>computed path to artifact, do not specify it - will be overwritten<span class="pl-pds">"</span></span>
+      }
+    ]
+  },
+  <span class="pl-s"><span class="pl-pds">"</span>win<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>see https://github.com/mongodb-js/electron-installer-squirrel-windows#opts<span class="pl-pds">"</span></span>
+}</pre></div>
+
+<p>As you can see, you need to customize OS X options only if you want to provide custom <code>x, y</code>.
+Don't customize paths to background and icon, — just follow conventions (if you don't want to use <code>build</code> as directory of resources — please create issue to ask ability to customize it).</p>
+
+<p>See <a href="https://www.npmjs.com/package/appdmg#json-specification">OS X options</a> and <a href="https://github.com/electronjs/windows-installer#configuring">Windows options</a>.</p>
+
+<h1>
+<a id="auto-update" class="anchor" href="#auto-update" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Auto Update</h1>
+
+<p>electron-complete-builder produces all required artifacts:</p>
+
+<ul>
+<li>
+<code>.dmg</code>: OS X installer, required for OS X user to initial install.</li>
+<li>
+<code>-mac.zip</code>: required for Squirrel.Mac.</li>
+<li>
+<code>.exe</code> and <code>-x64.exe</code>: Windows installer, required for Windows user to initial install. Please note — <a href="https://github.com/electronjs/windows-installer#handling-squirrel-events">your app must handle Squirrel.Windows events</a>. See <a href="https://github.com/develar/onshape-desktop-shell/blob/master/src/WinSquirrelStartupEventHandler.ts">real example</a>.</li>
+<li>
+<code>.full-nupkg</code>: required for Squirrel.Windows.</li>
+</ul>
+
+<p>You need to deploy somewhere <a href="https://github.com/GitbookIO/nuts">releases/downloads server</a>.</p>
+
+<p>In general, there is a possibility to setup it as a service for all (it is boring and stupid to setup own if cloud service is possible). May be I will setup it soon (feel free to file an issue to track progress). It is safe since you should sign your app in any case (so, even if server will be compromised, users will not be affected because OS X will just block unsigned/unidentified app).</p>
+
+<h1>
+<a id="code-signing" class="anchor" href="#code-signing" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Code signing</h1>
+
+<p>On a development machine set environment variable <code>CSC_NAME</code> to your identity (recommended). Or pass <code>--sign</code> parameter.</p>
+
+<pre><code>export CSC_NAME="Developer ID Application: Your Name (code)"
+</code></pre>
+
+<h2>
+<a id="travis" class="anchor" href="#travis" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Travis</h2>
+
+<p>To sign app on Travis server:</p>
+
+<ol>
+<li>
+<a href="https://developer.apple.com/library/ios/documentation/IDEs/Conceptual/AppDistributionGuide/MaintainingCertificates/MaintainingCertificates.html#//apple_ref/doc/uid/TP40012582-CH31-SW7">Export</a> certificate. <a href="http://security.stackexchange.com/a/54773">Strong password</a> must be used. Consider to not use special characters (for bash) because “<em>values are not escaped when your builds are executed</em>”.</li>
+<li>Upload <code>*.p12</code> file (e.g. on <a href="http://www.syncwithtech.org/p/direct-download-link-generator.html">Google Drive</a>).</li>
+<li>
+<a href="https://docs.travis-ci.com/user/environment-variables/#Encrypted-Variables">Set</a> <code>CSC_LINK</code> and <code>CSC_KEY_PASSWORD</code> environment variables:</li>
+</ol>
+
+<pre><code>travis encrypt "CSC_LINK='https://drive.google.com/uc?export=download&amp;id=***'" --add
+travis encrypt 'CSC_KEY_PASSWORD=beAwareAboutBashEscaping!!!' --add
+</code></pre>
+
+<h2>
+<a id="appveyor" class="anchor" href="#appveyor" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>AppVeyor</h2>
+
+<p>Windows code signing is not yet supported in a smart way, you need to pass corresponding <a href="https://github.com/electronjs/windows-installer#configuring">windows-installer</a> options directly.</p>
+
+<h1>
+<a id="windows" class="anchor" href="#windows" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Windows</h1>
+
+<p>Hint: You don't need a windows machine to build windows artifacts — use <a href="http://www.appveyor.com/">AppVeyor</a>. See  <a href="https://github.com/develar/onshape-desktop-shell/blob/master/appveyor.yml">sample appveyor.yml to build Electron app on windows</a>.</p>
+
+<h1>
+<a id="build-version-management" class="anchor" href="#build-version-management" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Build Version Management</h1>
+
+<p><code>CFBundleVersion</code> (OS X) and <code>FileVersion</code> (Windows) will be set automatically to <code>version</code>.<code>build_number</code> on CI server (Travis, AppVeyor and CircleCI supported).</p>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/develar/electron-complete-builder">electron-complete-builder</a> is maintained by <a href="https://github.com/develar">develar</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+            <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-73216306-1");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+  </body>
+</html>
