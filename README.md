@@ -4,6 +4,7 @@ Complete solution to build ready for distribution and "auto update" installers o
 * [Auto Update](#auto-update) ready application packaging.
 * [Code Signing](#code-signing) on a CI server or development machine.
 * [Build version management](#build-version-management).
+* [Publishing artifacts to GitHub Releases](https://github.com/develar/electron-complete-builder/wiki/Publishing-artifacts).
 
 [electron-packager](https://github.com/maxogden/electron-packager),
 [appdmg](https://github.com/LinusU/node-appdmg) and
