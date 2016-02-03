@@ -12,7 +12,7 @@ function versionNumber() {
 }
 
 const token = new Buffer("MDk3ZjI5ZTRmNTRkMjYwMGNiNzU0OWU3YzNhYjJhMTYwNzIxODU0Yg ==", "base64").toString()
-const iconPath = join(__dirname, "test-app", "build", "icon.icns")
+const iconPath = join(__dirname, "fixtures", "test-app", "build", "icon.icns")
 
 //test("GitHub unauthorized", async (t) => {
 //  t.throws(await new GitHubPublisher("github-releases-test", "test-repo", versionNumber(), "incorrect token")

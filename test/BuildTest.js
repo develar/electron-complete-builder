@@ -8,18 +8,23 @@ import { parse as parsePlist } from "plist"
 import { Packager } from "../out/packager"
 import { exec } from "../out/util"
 import { deleteDirectory, readFile } from "../out/promisifed-fs"
-import { CSC_LINK, CSC_KEY_PASSWORD } from "./codeSignData"
+import { CSC_LINK, CSC_KEY_PASSWORD } from "./helpers/codeSignData"
 
 const copyDir = Promise.promisify(fse.copy)
 const tmpDir = Promise.promisify(tmp.dir)
 
-async function assertPack(assert, projectDir, platform) {
-  if (platform === "win32") {
-    // win test uses the same dir as mac test, but we cannot share node_modules (because tests executed in parallel)
-    let dir = await tmpDir()
+async function assertPack(projectDir, platform) {
+  projectDir = path.join(__dirname, "fixtures", projectDir)
+  const isMac = platform === "darwin"
+  if (!isMac) {
+    // non-osx test uses the same dir as osx test, but we cannot share node_modules (because tests executed in parallel)
+    const dir = await tmpDir({
+      unsafeCleanup: true,
+      prefix: platform
+    })
     await copyDir(projectDir, dir, {
       filter: function (p) {
-        const basename = path.basename(p);
+        const basename = path.basename(p)
         return basename !== "dist" && basename !== "node_modules" && basename[0] !== "."
       }
     })
@@ -34,8 +39,8 @@ async function assertPack(assert, projectDir, platform) {
     platform: platform,
   })
 
-  // for win we always use temp dir, so, don't need to clean
-  if (platform !== "win32") {
+  // for non-osx we always use temp dir, so, don't need to clean
+  if (isMac) {
     await deleteDirectory(path.join(projectDir, "dist"))
   }
 
@@ -61,21 +66,21 @@ if (!process.env.APPVEYOR) {
     process.env.CIRCLE_BUILD_NUM = 42
   }
 
-  test("two-package.json project", async t => {
-    await assertPack(t, path.join(__dirname, "test-app"), "darwin")
+  test("mac: two-package.json", async t => {
+    await assertPack("test-app", "darwin")
   })
 
-  test("one-package.json project", async t => {
-    await assertPack(t, path.join(__dirname, "test-app-one"), "darwin")
+  test("mac: one-package.json", async t => {
+    await assertPack("test-app-one", "darwin")
   })
 
-  test("linux two-package.json project", async t => {
-    await assertPack(t, path.join(__dirname, "test-app"), "linux")
+  test("linux: two-package.json", async t => {
+    await assertPack("test-app-one", "linux")
   })
 }
 
 if (!process.env.TRAVIS) {
-  test("two-package.json project win", async t => {
-    await assertPack(t, path.join(__dirname, "test-app"), "win32")
+  test("win: two-package.json", async t => {
+    await assertPack("test-app-one", "win32")
   })
 }

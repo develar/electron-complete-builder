@@ -16,9 +16,9 @@
     "preversion": "npm prune && npm run compile && npm run test"
   },
   "dependencies": {
-    "bluebird": "^3.1.5",
+    "bluebird": "^3.2.1",
     "command-line-args": "^2.1.4",
-    "electron-packager": "^5.2.1",
+    "electron-packager-tf": "^5.2.1-beta.0",
     "electron-winstaller-temp-fork": "^0.1.0",
     "hosted-git-info": "^2.1.4",
     "json-parse-helpfulerror": "^1.0.3",
@@ -32,7 +32,7 @@
     "appdmg": "^0.3.5"
   },
   "devDependencies": {
-    "ava-tf": "^0.11.1",
+    "ava-tf": "0.11.2-beta.0",
     "babel-plugin-transform-es2015-parameters": "^6.4.5",
     "fs-extra": "^0.26.5",
     "plist": "^1.2.0",
@@ -57,11 +57,7 @@
     ]
   },
   "ava": {
-    "verbose": true,
-    "files": [
-      "test/*.js",
-      "!test/codeSignData.js"
-    ]
+    "verbose": true
   },
   "keywords": [
     "electron",

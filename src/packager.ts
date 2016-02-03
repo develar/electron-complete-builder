@@ -1,14 +1,14 @@
 import * as fs from "fs"
 import * as path from "path"
 import { DEFAULT_APP_DIR_NAME, installDependencies, log, getElectronVersion, spawn } from "./util"
-import { renameFile, parseJsonFile, deleteDirectory } from "./promisifed-fs"
+import { renameFile, parseJsonFile, deleteDirectory, stat } from "./promisifed-fs"
 import { createKeychain, deleteKeychain, CodeSigningInfo, generateKeychainName, sign } from "./codeSign"
 import { all, executeFinally } from "./promise"
 import { EventEmitter } from "events"
 import { Promise as BluebirdPromise } from "bluebird"
 import { tsAwaiter } from "./awaiter"
 import { MetadataProvider, AppMetadata, DevMetadata, InfoRetriever, DevBuildMetadata } from "./repositoryInfo"
-import packager = require("electron-packager")
+import packager = require("electron-packager-tf")
 
 const __awaiter = tsAwaiter
 Array.isArray(__awaiter)
@@ -252,7 +252,7 @@ export class Packager implements MetadataProvider {
           ProductName: this.metadata.name,
           InternalName: this.metadata.name,
         }
-      }, this.metadata.build)
+      }, this.metadata.build, {"use-temp-dir": false})
 
       // this option only for windows-installer
       delete options.iconUrl
@@ -315,29 +315,50 @@ export class Packager implements MetadataProvider {
 
     const version = this.metadata.version
     const outputDirectory = this.outDir + "-installer"
-    return new BluebirdPromise<any>((resolve, reject) => {
-      require("electron-winstaller-temp-fork").build(Object.assign({
-        name: this.metadata.name,
-        appDirectory: this.outDir,
-        outputDirectory: outputDirectory,
-        productName: this.metadata.name,
-        version: version,
-        description: this.metadata.description,
-        authors: this.metadata.author,
-        iconUrl: iconUrl,
-        setupIcon: path.join(this.projectDir, "build", "icon.ico"),
-      }, customOptions), (error: Error) => error == null ? resolve(null) : reject(error))
-    })
-      .then(() => {
-        const appName = this.metadata.name
-        const archSuffix = (arch === "x64") ? "-x64" : ""
-        return Promise.all([
-          renameFile(path.join(outputDirectory, appName + "Setup.exe"), path.join(outputDirectory, appName + "Setup-" + version + archSuffix + ".exe"))
-            .then(it => this.dispatchArtifactCreated(it)),
-          renameFile(path.join(outputDirectory, appName + "-" + version + "-full.nupkg"), path.join(outputDirectory, appName + "-" + version + archSuffix + "-full.nupkg"))
-            .then(it => this.dispatchArtifactCreated(it))
-        ])
+    const options = Object.assign({
+      name: this.metadata.name,
+      appDirectory: this.outDir,
+      outputDirectory: outputDirectory,
+      productName: this.metadata.name,
+      version: version,
+      description: this.metadata.description,
+      authors: this.metadata.author,
+      iconUrl: iconUrl,
+      setupIcon: path.join(this.projectDir, "build", "icon.ico"),
+    }, customOptions)
+
+    try {
+      await new BluebirdPromise<any>((resolve, reject) => {
+        require("electron-winstaller-temp-fork").build(options, (error: Error) => error == null ? resolve(null) : reject(error))
       })
+    }
+    catch (e) {
+      if (e.message.indexOf("Unable to set icon") < 0) {
+        throw e
+      }
+      else {
+        let fileInfo: fs.Stats
+        try {
+          fileInfo = await stat(options.setupIcon)
+        }
+        catch (e) {
+          throw new Error("Please specify correct setupIcon, file " + options.setupIcon + " not found")
+        }
+
+        if (fileInfo.isDirectory()) {
+          throw new Error("Please specify correct setupIcon, " + options.setupIcon + " is a directory")
+        }
+      }
+    }
+
+    const appName = this.metadata.name
+    const archSuffix = (arch === "x64") ? "-x64" : ""
+    return Promise.all([
+      renameFile(path.join(outputDirectory, appName + "Setup.exe"), path.join(outputDirectory, appName + "Setup-" + version + archSuffix + ".exe"))
+        .then(it => this.dispatchArtifactCreated(it)),
+      renameFile(path.join(outputDirectory, appName + "-" + version + "-full.nupkg"), path.join(outputDirectory, appName + "-" + version + archSuffix + "-full.nupkg"))
+        .then(it => this.dispatchArtifactCreated(it))
+    ])
   }
 
   private packageMacInDistributableFormat(buildMetadata: DevBuildMetadata, distPath: string): Promise<any> {

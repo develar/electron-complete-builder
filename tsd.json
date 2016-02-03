@@ -5,7 +5,7 @@
   "path": "typings",
   "installed": {
     "node/node.d.ts": {
-      "commit": "5d0f2126c8dac8fce0ff020218aea06607213b0d"
+      "commit": "e69fe60f2d6377ea4fae539493997b098f52cad1"
     },
     "electron-packager/electron-packager.d.ts": {
       "commit": "93bae1bb4c887c1375a4c1f0c3bb849ff06b8ac6"
@@ -26,10 +26,13 @@
       "commit": "46719185c564694c5583c4b7ad94dbb786ecad46"
     },
     "fs-extra/fs-extra.d.ts": {
-      "commit": "5d0f2126c8dac8fce0ff020218aea06607213b0d"
+      "commit": "e69fe60f2d6377ea4fae539493997b098f52cad1"
     },
     "should/should.d.ts": {
       "commit": "3d2f9971a107e2eee2de3ec5318f5c54071e16ed"
+    },
+    "tmp/tmp.d.ts": {
+      "commit": "e69fe60f2d6377ea4fae539493997b098f52cad1"
     }
   }
 }
