@@ -11,12 +11,13 @@ init:
 
 install:
   - ps: Install-Product node 5 x64
+  - npm install npm -g
+  - node -v
+  - npm -v
   - npm prune
-  - npm install
+  - npm update
 
 build_script:
-  - node --version
-  - npm --version
   - npm run compile
   - npm run test
 

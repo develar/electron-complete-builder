@@ -18,8 +18,8 @@ install:
 - npm install npm -g
 - npm -v
 - npm prune
-- npm install
-- npm run compile
+- npm update
 
 script:
+- npm run compile
 - npm run test

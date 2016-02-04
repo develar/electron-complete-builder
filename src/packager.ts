@@ -252,7 +252,7 @@ export class Packager implements MetadataProvider {
           ProductName: this.metadata.name,
           InternalName: this.metadata.name,
         }
-      }, this.metadata.build, {"use-temp-dir": false})
+      }, this.metadata.build, {"tmpdir": false})
 
       // this option only for windows-installer
       delete options.iconUrl

@@ -18,7 +18,7 @@
   "dependencies": {
     "bluebird": "^3.2.1",
     "command-line-args": "^2.1.4",
-    "electron-packager-tf": "^5.2.1-beta.0",
+    "electron-packager-tf": "^5.2.1-beta.1",
     "electron-winstaller-temp-fork": "^0.1.0",
     "hosted-git-info": "^2.1.4",
     "json-parse-helpfulerror": "^1.0.3",
