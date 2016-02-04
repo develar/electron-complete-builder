@@ -19,6 +19,6 @@ install:
 
 build_script:
   - npm run compile
-  - npm run test
 
-build: off
+test_script:
+  - npm run test
