@@ -15,7 +15,7 @@ install:
   - node -v
   - npm -v
   - npm prune
-  - npm update
+  - npm install
 
 build_script:
   - npm run compile
