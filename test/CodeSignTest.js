@@ -2,7 +2,7 @@ import { createKeychain, deleteKeychain, generateKeychainName } from "../out/cod
 import assertThat from "should/as-function"
 import test from "ava-tf"
 import { CSC_NAME, CSC_LINK, CSC_KEY_PASSWORD } from "./helpers/codeSignData"
-const promises = require("../out/promise")
+import promises from "../out/promise"
 
 test("create keychain", async function () {
   const keychainName = generateKeychainName()

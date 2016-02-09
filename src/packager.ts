@@ -101,7 +101,7 @@ export class Packager implements MetadataProvider {
   private async doBuild(cleanupTasks: Array<() => Promise<any>>): Promise<any> {
     const isMac = this.isMac
     const archs = isMac ? ["x64"] : (this.options.arch == null || this.options.arch === "all" ? ["ia32", "x64"] : [this.options.arch])
-    let codeSigningInfo: CodeSigningInfo = null
+    let macCodeSigningInfo: CodeSigningInfo = null
     let keychainName: string = null
 
     for (let arch of archs) {
@@ -119,13 +119,13 @@ export class Packager implements MetadataProvider {
           await BluebirdPromise.all([
             this.pack(arch),
             createKeychain(keychainName, this.options.cscLink, this.options.cscKeyPassword)
-              .then(it => codeSigningInfo = it)
+              .then(it => macCodeSigningInfo = it)
           ])
         }
         else {
           await this.pack(arch)
         }
-        await this.signMac(distPath, codeSigningInfo)
+        await this.signMac(distPath, macCodeSigningInfo)
       }
       else if (this.options.dist && this.options.platform === "win32") {
         const installerOut = this.outDir + "-installer"
