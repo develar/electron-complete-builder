@@ -15,8 +15,9 @@ const tmpDir = Promise.promisify(tmp.dir)
 
 async function assertPack(projectDir, platform) {
   projectDir = path.join(__dirname, "fixtures", projectDir)
-  const isMac = platform === "darwin"
-  if (!isMac) {
+  // const isDoNotUseTempDir = platform === "darwin"
+  const isDoNotUseTempDir = true
+  if (!isDoNotUseTempDir) {
     // non-osx test uses the same dir as osx test, but we cannot share node_modules (because tests executed in parallel)
     const dir = await tmpDir({
       unsafeCleanup: true,
@@ -40,7 +41,7 @@ async function assertPack(projectDir, platform) {
   })
 
   // for non-osx we always use temp dir, so, don't need to clean
-  if (isMac) {
+  if (isDoNotUseTempDir) {
     await deleteDirectory(path.join(projectDir, "dist"))
   }
 

@@ -16,7 +16,7 @@
     "preversion": "npm prune && npm run compile && npm run test"
   },
   "dependencies": {
-    "bluebird": "^3.2.1",
+    "bluebird": "^3.2.2",
     "command-line-args": "^2.1.4",
     "electron-packager-tf": "^5.2.1-beta.1",
     "electron-winstaller-temp-fork": "^0.1.0",
@@ -26,20 +26,20 @@
     "progress": "^1.1.8",
     "progress-stream": "^1.2.0",
     "rimraf": "^2.5.1",
-    "source-map-support": "^0.4.0"
+    "source-map-support": "^0.4.0",
+    "fs-extra": "^0.26.5"
   },
   "optionalDependencies": {
     "appdmg": "^0.3.5"
   },
   "devDependencies": {
     "ava-tf": "0.11.2-beta.0",
-    "babel-plugin-transform-es2015-parameters": "^6.4.5",
-    "fs-extra": "^0.26.5",
+    "babel-plugin-transform-es2015-parameters": "^6.5.0",
     "plist": "^1.2.0",
-    "should": "^8.2.1",
+    "should": "^8.2.2",
     "tmp": "0.0.28",
     "ts-babel": "^0.3.0",
-    "tsconfig-glob": "^0.4.0",
+    "tsconfig-glob": "^0.4.1",
     "tslint": "^3.3.0",
     "typescript": "^1.8.0-beta"
   },

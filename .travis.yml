@@ -9,6 +9,14 @@ cache:
     - test/testApp/node_modules
     - $HOME/.electron
     - $HOME/.npm
+    - /usr/local/Cellar
+    - /Library/Caches/Homebrew
+    - /usr/local/Library
+
+before_install:
+  - brew update
+  - brew upgrade
+  - brew install dpkg
 
 install:
 - rm -rf ~/.nvm

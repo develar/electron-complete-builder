@@ -9,6 +9,7 @@ import { Promise as BluebirdPromise } from "bluebird"
 import { tsAwaiter } from "./awaiter"
 import { MetadataProvider, AppMetadata, DevMetadata, InfoRetriever, DevBuildMetadata } from "./repositoryInfo"
 import packager = require("electron-packager-tf")
+import { DebOptions, makeDeb } from "./deb"
 
 const __awaiter = tsAwaiter
 Array.isArray(__awaiter)
@@ -103,7 +104,7 @@ export class Packager implements MetadataProvider {
     const archs = isMac ? ["x64"] : (this.options.arch == null || this.options.arch === "all" ? ["ia32", "x64"] : [this.options.arch])
     let macCodeSigningInfo: CodeSigningInfo = null
     let keychainName: string = null
-
+    const distTasks: Array<Promise<any>> = []
     for (let arch of archs) {
       await this.installAppDependencies(arch)
 
@@ -111,7 +112,6 @@ export class Packager implements MetadataProvider {
       log("Removing %s", this.outDir)
       await deleteDirectory(this.outDir)
 
-      const distPath = path.join(this.outDir, this.metadata.name + (isMac ? ".app" : "-win32-" + arch))
       if (isMac) {
         if (keychainName == null && (this.options.cscLink != null && this.options.cscKeyPassword != null)) {
           keychainName = generateKeychainName()
@@ -125,7 +125,7 @@ export class Packager implements MetadataProvider {
         else {
           await this.pack(arch)
         }
-        await this.signMac(distPath, macCodeSigningInfo)
+        await this.signMac(path.join(this.outDir, this.metadata.name + ".app"), macCodeSigningInfo)
       }
       else if (this.options.dist && this.options.platform === "win32") {
         const installerOut = this.outDir + "-installer"
@@ -136,22 +136,16 @@ export class Packager implements MetadataProvider {
         await this.pack(arch)
       }
 
-      if (this.options.dist && this.options.platform !== "linux") {
-        const distPromise = this.packageInDistributableFormat(arch, distPath)
+      if (this.options.dist) {
+        distTasks.push(this.packageInDistributableFormat(arch))
         if (isMac) {
-          await BluebirdPromise.all([
-            distPromise,
-            this.zipMacApp()
-              .then(it => this.dispatchArtifactCreated(it))
-          ])
-        }
-        else {
-          await distPromise
+          distTasks.push(this.zipMacApp()
+            .then(it => this.dispatchArtifactCreated(it)))
         }
       }
     }
 
-    return null
+    return await BluebirdPromise.all(distTasks)
   }
 
   private signMac(distPath: string, codeSigningInfo: CodeSigningInfo): Promise<any> {
@@ -282,13 +276,16 @@ export class Packager implements MetadataProvider {
       .thenReturn(this.outDir + "/" + resultPath)
   }
 
-  private async packageInDistributableFormat(arch: string, distPath: string): Promise<any> {
+  private packageInDistributableFormat(arch: string): Promise<any> {
     const buildMetadata = this.devMetadata.build
     if (this.options.platform === "win32") {
       return this.packageWinInDistributableFormat(buildMetadata, arch)
     }
+    else if (this.options.platform === "linux") {
+      return this.packageLinuxInDistributableFormat(buildMetadata, arch)
+    }
     else {
-      return this.packageMacInDistributableFormat(buildMetadata, distPath)
+      return this.packageMacInDistributableFormat(buildMetadata)
     }
   }
 
@@ -353,7 +350,7 @@ export class Packager implements MetadataProvider {
 
     const appName = this.metadata.name
     const archSuffix = (arch === "x64") ? "-x64" : ""
-    return Promise.all([
+    return await Promise.all([
       renameFile(path.join(outputDirectory, appName + "Setup.exe"), path.join(outputDirectory, appName + "Setup-" + version + archSuffix + ".exe"))
         .then(it => this.dispatchArtifactCreated(it)),
       renameFile(path.join(outputDirectory, appName + "-" + version + "-full.nupkg"), path.join(outputDirectory, appName + "-" + version + archSuffix + "-full.nupkg"))
@@ -361,7 +358,7 @@ export class Packager implements MetadataProvider {
     ])
   }
 
-  private packageMacInDistributableFormat(buildMetadata: DevBuildMetadata, distPath: string): Promise<any> {
+  private packageMacInDistributableFormat(buildMetadata: DevBuildMetadata): Promise<any> {
     const artifactPath = path.join(this.outDir, this.metadata.name + "-" + this.metadata.version + ".dmg")
     return new BluebirdPromise<any>((resolve, reject) => {
       log("Creating DMG")
@@ -389,7 +386,7 @@ export class Packager implements MetadataProvider {
         specification.title = this.metadata.name
       }
 
-      specification.contents[1].path = distPath
+      specification.contents[1].path = path.join(this.outDir, this.metadata.name + ".app")
 
       const appDmg = require("appdmg")
       const emitter = appDmg({
@@ -401,5 +398,22 @@ export class Packager implements MetadataProvider {
       emitter.on("finish", () => resolve())
     })
       .then(() => this.dispatchArtifactCreated(artifactPath))
+  }
+
+  private packageLinuxInDistributableFormat(buildMetadata: DevBuildMetadata, arch: string): Promise<any> {
+    const specification: DebOptions = {
+      version: this.metadata.version,
+      packageName: this.metadata.name,
+      packageDescription: this.metadata.description,
+      installPath: '/opt/' + this.metadata.name,
+      maintainer: this.metadata.author,
+      architecture: arch,
+    }
+
+    if (buildMetadata != null && buildMetadata.linux != null) {
+      Object.assign(specification, buildMetadata.linux)
+    }
+    return makeDeb(specification, this.outDir)
+      .then(it => this.dispatchArtifactCreated(it))
   }
 }

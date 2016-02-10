@@ -57,7 +57,7 @@ declare module "fs-extra" {
 	export function mkdirsSync(dir: string, options?: MkdirOptions): void;
 	export function mkdirpSync(dir: string, options?: MkdirOptions): void;
 
-	export function outputFile(file: string, data: any, callback?: (err: Error) => void): void;
+	function outputFile(file: string, data: any, callback: (err: Error) => void): void;
 	export function outputFileSync(file: string, data: any): void;
 
 	export function outputJson(file: string, data: any, callback?: (err: Error) => void): void;
@@ -202,4 +202,11 @@ declare module "fs-extra" {
 	export function createReadStream(path: string, options?: ReadStreamOptions): ReadStream;
 	export function createWriteStream(path: string, options?: WriteStreamOptions): WriteStream;
 	export function createOutputStream(path: string, options?: WriteStreamOptions): WriteStream;
+
+	interface MoveOptions {
+		// default: false
+		clobber?: boolean
+	}
+
+	function move(src: string, dest: string, options: MoveOptions, callback: (error: Error) => void): void
 }

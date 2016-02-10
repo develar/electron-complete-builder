@@ -20,7 +20,8 @@ export interface DevMetadata extends Metadata {
 
 export interface DevBuildMetadata {
   osx: appdmg.Specification
-  win: any
+  win: any,
+  linux: any
 }
 
 export interface AppMetadata extends Metadata {
