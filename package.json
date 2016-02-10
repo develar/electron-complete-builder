@@ -1,7 +1,7 @@
 {
   "name": "electron-complete-builder",
   "description": "Complete solution to build ready for distribution and 'auto update' installers of your Electron App",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "license": "MIT",
   "bin": {
     "install-app-deps": "./out/install-app-deps.js",
@@ -18,7 +18,7 @@
   "dependencies": {
     "bluebird": "^3.2.2",
     "command-line-args": "^2.1.4",
-    "electron-packager-tf": "^5.2.1-beta.1",
+    "electron-packager-tf": "^5.2.1-beta.2",
     "electron-winstaller-temp-fork": "^0.1.0",
     "hosted-git-info": "^2.1.4",
     "json-parse-helpfulerror": "^1.0.3",

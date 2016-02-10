@@ -109,9 +109,6 @@ export class Packager implements MetadataProvider {
       await this.installAppDependencies(arch)
 
       this.outDir = path.join(this.projectDir, "dist", this.metadata.name + "-" + this.options.platform + "-" + arch)
-      log("Removing %s", this.outDir)
-      await deleteDirectory(this.outDir)
-
       if (isMac) {
         if (keychainName == null && (this.options.cscLink != null && this.options.cscKeyPassword != null)) {
           keychainName = generateKeychainName()
@@ -236,6 +233,7 @@ export class Packager implements MetadataProvider {
         version: this.electronVersion,
         icon: path.join(this.projectDir, "build", "icon"),
         asar: true,
+        overwrite: true,
         "app-version": version,
         "build-version": buildVersion,
         "version-string": {
@@ -405,7 +403,7 @@ export class Packager implements MetadataProvider {
       version: this.metadata.version,
       packageName: this.metadata.name,
       packageDescription: this.metadata.description,
-      installPath: '/opt/' + this.metadata.name,
+      installPath: "/opt/" + this.metadata.name,
       maintainer: this.metadata.author,
       architecture: arch,
     }
