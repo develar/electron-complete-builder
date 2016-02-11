@@ -1,5 +1,6 @@
 os:
   - osx
+  - linux
 
 language: cpp
 
@@ -14,9 +15,8 @@ cache:
     - /usr/local/Library
 
 before_install:
-  - brew update
-  - brew upgrade
-  - brew install dpkg
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install fpm; fi
 
 install:
 - rm -rf ~/.nvm

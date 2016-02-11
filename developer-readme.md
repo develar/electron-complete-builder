@@ -7,7 +7,9 @@ brew install mono
 ```
 
 # Running linux tests on OS X
+Do not use OS X bundled Ruby. Install using brew.
 
 ```
-brew install dpkg
+brew install ruby
+gem install fpm
 ```

@@ -34,15 +34,6 @@ function addHandler(emitter: EventEmitter, event: string, handler: Function) {
   emitter.on(event, handler)
 }
 
-export function setDefaultOptionValues(options: PackagerOptions) {
-  if (options.arch == null) {
-    options.arch = "all"
-  }
-  if (options.platform == null) {
-    options.platform = process.platform
-  }
-}
-
 export class Packager implements MetadataProvider {
   private projectDir: string
 
@@ -60,8 +51,6 @@ export class Packager implements MetadataProvider {
   private eventEmitter = new EventEmitter()
 
   constructor(private options?: PackagerOptions, private repositoryInfo: InfoRetriever = null) {
-    setDefaultOptionValues(options || {})
-
     this.projectDir = options.projectDir == null ? process.cwd() : path.resolve(options.projectDir)
     this.appDir = this.computeAppDirectory()
   }
@@ -73,10 +62,6 @@ export class Packager implements MetadataProvider {
 
   private dispatchArtifactCreated(path: string) {
     this.eventEmitter.emit("artifactCreated", path)
-  }
-
-  private get isMac(): boolean {
-    return this.options.platform === "darwin"
   }
 
   get devPackageFile(): string {
@@ -100,44 +85,47 @@ export class Packager implements MetadataProvider {
   }
 
   private async doBuild(cleanupTasks: Array<() => Promise<any>>): Promise<any> {
-    const isMac = this.isMac
-    const archs = isMac ? ["x64"] : (this.options.arch == null || this.options.arch === "all" ? ["ia32", "x64"] : [this.options.arch])
+    const platforms = this.options.platform === "all" ? getSupportedPlatforms() : [this.options.platform || process.platform]
     let macCodeSigningInfo: CodeSigningInfo = null
     let keychainName: string = null
     const distTasks: Array<Promise<any>> = []
-    for (let arch of archs) {
-      await this.installAppDependencies(arch)
+    for (let platform of platforms) {
+      const isMac = platform === "darwin"
+      const archs = isMac ? ["x64"] : (this.options.arch == null || this.options.arch === "all" ? ["ia32", "x64"] : [this.options.arch])
+      for (let arch of archs) {
+        await this.installAppDependencies(arch)
 
-      this.outDir = path.join(this.projectDir, "dist", this.metadata.name + "-" + this.options.platform + "-" + arch)
-      if (isMac) {
-        if (keychainName == null && (this.options.cscLink != null && this.options.cscKeyPassword != null)) {
-          keychainName = generateKeychainName()
-          cleanupTasks.push(() => deleteKeychain(keychainName))
-          await BluebirdPromise.all([
-            this.pack(arch),
-            createKeychain(keychainName, this.options.cscLink, this.options.cscKeyPassword)
-              .then(it => macCodeSigningInfo = it)
-          ])
+        this.outDir = path.join(this.projectDir, "dist", this.metadata.name + "-" + platform + "-" + arch)
+        if (isMac) {
+          if (keychainName == null && (this.options.cscLink != null && this.options.cscKeyPassword != null)) {
+            keychainName = generateKeychainName()
+            cleanupTasks.push(() => deleteKeychain(keychainName))
+            await BluebirdPromise.all([
+              this.pack(platform, arch),
+              createKeychain(keychainName, this.options.cscLink, this.options.cscKeyPassword)
+                .then(it => macCodeSigningInfo = it)
+            ])
+          }
+          else {
+            await this.pack(platform, arch)
+          }
+          await this.signMac(path.join(this.outDir, this.metadata.name + ".app"), macCodeSigningInfo)
+        }
+        else if (this.options.dist && platform === "win32") {
+          const installerOut = this.outDir + "-installer"
+          log("Removing %s", installerOut)
+          await BluebirdPromise.all([this.pack(platform, arch), deleteDirectory(installerOut)])
         }
         else {
-          await this.pack(arch)
+          await this.pack(platform, arch)
         }
-        await this.signMac(path.join(this.outDir, this.metadata.name + ".app"), macCodeSigningInfo)
-      }
-      else if (this.options.dist && this.options.platform === "win32") {
-        const installerOut = this.outDir + "-installer"
-        log("Removing %s", installerOut)
-        await BluebirdPromise.all([this.pack(arch), deleteDirectory(installerOut)])
-      }
-      else {
-        await this.pack(arch)
-      }
 
-      if (this.options.dist) {
-        distTasks.push(this.packageInDistributableFormat(arch))
-        if (isMac) {
-          distTasks.push(this.zipMacApp()
-            .then(it => this.dispatchArtifactCreated(it)))
+        if (this.options.dist) {
+          distTasks.push(this.packageInDistributableFormat(platform, arch))
+          if (isMac) {
+            distTasks.push(this.zipMacApp()
+              .then(it => this.dispatchArtifactCreated(it)))
+          }
         }
       }
     }
@@ -215,7 +203,7 @@ export class Packager implements MetadataProvider {
     }
   }
 
-  private pack(arch: string) {
+  private pack(platform: string, arch: string) {
     return new BluebirdPromise((resolve, reject) => {
       const version = this.metadata.version
       let buildVersion = version
@@ -228,7 +216,7 @@ export class Packager implements MetadataProvider {
         dir: this.appDir,
         out: path.dirname(this.outDir),
         name: this.metadata.name,
-        platform: this.options.platform,
+        platform: platform,
         arch: arch,
         version: this.electronVersion,
         icon: path.join(this.projectDir, "build", "icon"),
@@ -274,12 +262,12 @@ export class Packager implements MetadataProvider {
       .thenReturn(this.outDir + "/" + resultPath)
   }
 
-  private packageInDistributableFormat(arch: string): Promise<any> {
+  private packageInDistributableFormat(platform: string, arch: string): Promise<any> {
     const buildMetadata = this.devMetadata.build
-    if (this.options.platform === "win32") {
+    if (platform === "win32") {
       return this.packageWinInDistributableFormat(buildMetadata, arch)
     }
-    else if (this.options.platform === "linux") {
+    else if (platform === "linux") {
       return this.packageLinuxInDistributableFormat(buildMetadata, arch)
     }
     else {
@@ -401,11 +389,12 @@ export class Packager implements MetadataProvider {
   private packageLinuxInDistributableFormat(buildMetadata: DevBuildMetadata, arch: string): Promise<any> {
     const specification: DebOptions = {
       version: this.metadata.version,
-      packageName: this.metadata.name,
-      packageDescription: this.metadata.description,
-      installPath: "/opt/" + this.metadata.name,
+      title: this.metadata.name,
+      comment: this.metadata.description,
       maintainer: this.metadata.author,
-      architecture: arch,
+      arch: arch === "ia32" ? 32 : 64,
+      target: "deb",
+      executable: this.metadata.name,
     }
 
     if (buildMetadata != null && buildMetadata.linux != null) {
@@ -413,5 +402,17 @@ export class Packager implements MetadataProvider {
     }
     return makeDeb(specification, this.outDir)
       .then(it => this.dispatchArtifactCreated(it))
+  }
+}
+
+function getSupportedPlatforms(): string[] {
+  if (process.platform === "darwin") {
+    return ["darwin", "win32", "linux"]
+  }
+  else if (process.platform === "win32") {
+    return ["win32"]
+  }
+  else {
+    return ["linux", "win32"]
   }
 }

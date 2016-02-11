@@ -75,13 +75,13 @@ if (!process.env.APPVEYOR) {
     await assertPack("test-app-one", "darwin")
   })
 
-  test("linux: two-package.json", async t => {
+  test("linux", async t => {
     await assertPack("test-app-one", "linux")
   })
 }
 
 if (!process.env.TRAVIS) {
-  test("win: two-package.json", async t => {
+  test("win", async t => {
     await assertPack("test-app-one", "win32")
   })
 }

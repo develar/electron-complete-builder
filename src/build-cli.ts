@@ -1,6 +1,6 @@
 #! /usr/bin/env node
 
-import { PackagerOptions, setDefaultOptionValues } from "./packager"
+import { PackagerOptions } from "./packager"
 import { build } from "./builder"
 import { PublishOptions } from "./gitHubPublisher"
 import { commonArgs } from "./util"
@@ -16,16 +16,13 @@ interface CliOptions extends PackagerOptions, PublishOptions {
   help: boolean
 }
 
-const defaultOptionValues: PackagerOptions = {}
-setDefaultOptionValues(defaultOptionValues)
-
 const cli = cla(commonArgs.concat(
-  {name: "arch", type: String, defaultValue: defaultOptionValues.arch, description: "ia32, x64 or all (by default)."},
+  {name: "arch", type: String, description: "ia32, x64 or all (by default)."},
   {name: "dist", type: Boolean, alias: "d", description: "Whether to package in a distributable format (e.g. DMG, windows installer, NuGet package)."},
   {name: "publish", type: String, alias: "p", description: "Publish artifacts (to GitHub Releases): onTag (on tag push only) or onTagOrDraft (on tag push or if draft release exists)."},
   {name: "build", type: Boolean, description: "Deprecated, use dist instead."},
   {name: "sign", type: String},
-  {name: "platform", type: String, defaultValue: defaultOptionValues.platform, description: "darwin or win32. Current platform (" + process.platform + ") by default."},
+  {name: "platform", type: String, description: "darwin or win32. Current platform (" + process.platform + ") by default."},
   {name: "help", alias: "h", type: Boolean}
 ))
 
