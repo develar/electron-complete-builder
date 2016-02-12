@@ -1,7 +1,7 @@
 {
   "name": "electron-complete-builder",
   "description": "Complete solution to build ready for distribution and 'auto update' installers of your Electron App",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "license": "MIT",
   "bin": {
     "install-app-deps": "./out/install-app-deps.js",
