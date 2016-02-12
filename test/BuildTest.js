@@ -13,6 +13,32 @@ import { CSC_LINK, CSC_KEY_PASSWORD } from "./helpers/codeSignData"
 const copyDir = Promise.promisify(fse.copy)
 const tmpDir = Promise.promisify(tmp.dir)
 
+const expectedLinuxContents = [ '/',
+  '/opt/',
+  '/opt/TestApp/',
+  '/opt/TestApp/LICENSE',
+  '/opt/TestApp/LICENSES.chromium.html',
+  '/opt/TestApp/TestApp',
+  '/opt/TestApp/content_shell.pak',
+  '/opt/TestApp/icudtl.dat',
+  '/opt/TestApp/libnode.so',
+  '/opt/TestApp/natives_blob.bin',
+  '/opt/TestApp/pkgtarget',
+  '/opt/TestApp/resources/',
+  '/opt/TestApp/resources/app.asar',
+  '/opt/TestApp/resources/atom.asar',
+  '/opt/TestApp/snapshot_blob.bin',
+  '/opt/TestApp/version',
+  '/usr/',
+  '/usr/share/',
+  '/usr/share/applications/',
+  '/usr/share/applications/TestApp.desktop',
+  '/usr/share/doc/',
+  '/usr/share/doc/testapp/',
+  '/usr/share/doc/testapp/changelog.Debian.gz',
+  '/usr/share/icons/',
+  '/usr/share/icons/hicolors/' ]
+
 async function assertPack(projectDir, platform) {
   projectDir = path.join(__dirname, "fixtures", projectDir)
   // const isDoNotUseTempDir = platform === "darwin"
@@ -54,6 +80,21 @@ async function assertPack(projectDir, platform) {
     const result = await exec("codesign", ["--verify", packedAppDir])
     assertThat(result[0].toString()).not.match(/is not signed at all/)
   }
+  else if (platform === "linux") {
+    assertThat(await getContents(projectDir + "/dist/TestApp-1.0.0-amd64.deb")).deepEqual(expectedLinuxContents)
+    assertThat(await getContents(projectDir + "/dist/TestApp-1.0.0-i386.deb")).deepEqual(expectedLinuxContents)
+    // console.log(await getContents(projectDir + "/dist/TestApp-1.0.0-amd64.deb"))
+    // console.log(await getContents(projectDir + "/dist/TestApp-1.0.0-i386.deb"))
+  }
+}
+
+async function getContents(path) {
+  const result = await exec("dpkg", ["--contents", path])
+  return result[0]
+    .split("\n")
+    .map(it => it.length === 0 ? null : it.substring(it.indexOf('.') + 1))
+    .filter(it => it != null && !(it.startsWith("/opt/TestApp/locales/") || it.startsWith("/opt/TestApp/libgcrypt")))
+    .sort()
 }
 
 if (process.env.TRAVIS !== "true") {

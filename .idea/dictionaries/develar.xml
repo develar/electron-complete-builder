@@ -4,6 +4,7 @@
       <w>actperepo</w>
       <w>appveyor</w>
       <w>archs</w>
+      <w>authenticode</w>
       <w>awaiter</w>
       <w>circleci</w>
       <w>clcerts</w>
@@ -15,6 +16,7 @@
       <w>enoent</w>
       <w>github</w>
       <w>globaldots</w>
+      <w>libgcrypt</w>
       <w>makedeb</w>
       <w>nokeys</w>
       <w>nomacver</w>

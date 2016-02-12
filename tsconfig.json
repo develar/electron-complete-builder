@@ -40,15 +40,18 @@
     "src/build-cli.ts",
     "src/builder.ts",
     "src/codeSign.ts",
-    "src/deb.ts",
     "src/gitHubPublisher.ts",
     "src/gitHubRequest.ts",
     "src/httpRequest.ts",
     "src/install-app-deps.ts",
+    "src/linuxPackager.ts",
+    "src/macPackager.ts",
     "src/packager.ts",
+    "src/platformPackager.ts",
     "src/promise.ts",
     "src/promisifed-fs.ts",
     "src/repositoryInfo.ts",
-    "src/util.ts"
+    "src/util.ts",
+    "src/winPackager.ts"
   ]
 }

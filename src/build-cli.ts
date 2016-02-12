@@ -1,6 +1,6 @@
 #! /usr/bin/env node
 
-import { PackagerOptions } from "./packager"
+import { PackagerOptions } from "./platformPackager"
 import { build } from "./builder"
 import { PublishOptions } from "./gitHubPublisher"
 import { commonArgs } from "./util"

@@ -1,56 +1,40 @@
 import * as fs from "fs"
 import * as path from "path"
-import { DEFAULT_APP_DIR_NAME, installDependencies, log, getElectronVersion, spawn } from "./util"
-import { renameFile, parseJsonFile, deleteDirectory, stat } from "./promisifed-fs"
-import { createKeychain, deleteKeychain, CodeSigningInfo, generateKeychainName, sign, downloadCertificate } from "./codeSign"
+import { DEFAULT_APP_DIR_NAME, installDependencies, log, getElectronVersion } from "./util"
+import { parseJsonFile } from "./promisifed-fs"
 import { all, executeFinally } from "./promise"
 import { EventEmitter } from "events"
 import { Promise as BluebirdPromise } from "bluebird"
 import { tsAwaiter } from "./awaiter"
-import { MetadataProvider, AppMetadata, DevMetadata, InfoRetriever, DevBuildMetadata } from "./repositoryInfo"
-import packager = require("electron-packager-tf")
-import { DebOptions, makeDeb } from "./deb"
+import { AppMetadata, InfoRetriever } from "./repositoryInfo"
+import { PackagerOptions, PlatformPackager, BuildInfo, DevMetadata } from "./platformPackager"
+import MacPackager from "./macPackager"
+import WinPackager from "./winPackager"
+import LinuxPackager from "./linuxPackager"
 
 const __awaiter = tsAwaiter
 Array.isArray(__awaiter)
-
-export interface PackagerOptions {
-  arch?: string
-
-  dist?: boolean
-  githubToken?: string
-
-  sign?: string
-  platform?: string
-  appDir?: string
-
-  projectDir?: string
-
-  cscLink?: string
-  cscKeyPassword?: string
-}
 
 function addHandler(emitter: EventEmitter, event: string, handler: Function) {
   emitter.on(event, handler)
 }
 
-export class Packager implements MetadataProvider {
-  private projectDir: string
+export class Packager implements BuildInfo {
+  projectDir: string
 
-  private appDir: string
-
-  private outDir: string
+  appDir: string
 
   metadata: AppMetadata
   devMetadata: DevMetadata
 
   private isTwoPackageJsonProjectLayoutUsed = true
 
-  private electronVersion: string
+  electronVersion: string
 
-  private eventEmitter = new EventEmitter()
+  eventEmitter = new EventEmitter()
 
-  constructor(private options?: PackagerOptions, private repositoryInfo: InfoRetriever = null) {
+  //noinspection JSUnusedLocalSymbols
+  constructor(public options: PackagerOptions, public repositoryInfo: InfoRetriever = null) {
     this.projectDir = options.projectDir == null ? process.cwd() : path.resolve(options.projectDir)
     this.appDir = this.computeAppDirectory()
   }
@@ -58,10 +42,6 @@ export class Packager implements MetadataProvider {
   artifactCreated(handler: (path: string) => void): Packager {
     addHandler(this.eventEmitter, "artifactCreated", handler)
     return this
-  }
-
-  private dispatchArtifactCreated(path: string) {
-    this.eventEmitter.emit("artifactCreated", path)
   }
 
   get devPackageFile(): string {
@@ -86,57 +66,19 @@ export class Packager implements MetadataProvider {
 
   private async doBuild(cleanupTasks: Array<() => Promise<any>>): Promise<any> {
     const platforms = this.options.platform === "all" ? getSupportedPlatforms() : [this.options.platform || process.platform]
-    let macCodeSigningInfo: CodeSigningInfo = null
-    let keychainName: string = null
     const distTasks: Array<Promise<any>> = []
-    let certFilePromise: Promise<string> = null
     for (let platform of platforms) {
-      const isMac = platform === "darwin"
-      const archs = isMac ? ["x64"] : (this.options.arch == null || this.options.arch === "all" ? ["ia32", "x64"] : [this.options.arch])
+      const helper = this.createHelper(platform, cleanupTasks)
+      const archs = platform === "darwin" ? ["x64"] : (this.options.arch == null || this.options.arch === "all" ? ["ia32", "x64"] : [this.options.arch])
       for (let arch of archs) {
         await this.installAppDependencies(arch)
 
-        this.outDir = path.join(this.projectDir, "dist", this.metadata.name + "-" + platform + "-" + arch)
-        if (isMac) {
-          if (keychainName == null && (this.options.cscLink != null && this.options.cscKeyPassword != null)) {
-            keychainName = generateKeychainName()
-            cleanupTasks.push(() => deleteKeychain(keychainName))
-            await BluebirdPromise.all([
-              this.pack(platform, arch),
-              createKeychain(keychainName, this.options.cscLink, this.options.cscKeyPassword)
-                .then(it => macCodeSigningInfo = it)
-            ])
-          }
-          else {
-            await this.pack(platform, arch)
-          }
-          await this.signMac(path.join(this.outDir, this.metadata.name + ".app"), macCodeSigningInfo)
-        }
-        else if (this.options.dist && platform === "win32") {
-          const installerOut = this.outDir + "-installer"
-          log("Removing %s", installerOut)
-          const tasks: Array<Promise<any>> = [
-            this.pack(platform, arch),
-            deleteDirectory(installerOut)
-          ]
-          // https://developer.mozilla.org/en-US/docs/Signing_an_executable_with_Authenticode
-          // https://github.com/Squirrel/Squirrel.Windows/pull/505
-          if (certFilePromise === null && this.options.cscLink != null && this.options.cscKeyPassword != null && process.platform !== "darwin") {
-            certFilePromise = downloadCertificate(this.options.cscLink)
-            tasks.push(certFilePromise)
-          }
-          await BluebirdPromise.all(tasks)
-        }
-        else {
-          await this.pack(platform, arch)
-        }
-
+        const outDir = path.join(this.projectDir, "dist", this.metadata.name + "-" + platform + "-" + arch)
+        await helper.pack(platform, arch, outDir)
         if (this.options.dist) {
-          distTasks.push(this.packageInDistributableFormat(platform, arch, certFilePromise))
-          if (isMac) {
-            distTasks.push(this.zipMacApp()
-              .then(it => this.dispatchArtifactCreated(it)))
-          }
+          const buildMetadata: any = this.devMetadata.build
+          const customConfiguration = buildMetadata == null ? buildMetadata : buildMetadata[helper.getBuildConfigurationKey()]
+          distTasks.push(helper.packageInDistributableFormat(outDir, customConfiguration, arch))
         }
       }
     }
@@ -144,18 +86,31 @@ export class Packager implements MetadataProvider {
     return await BluebirdPromise.all(distTasks)
   }
 
-  private signMac(distPath: string, codeSigningInfo: CodeSigningInfo): Promise<any> {
-    if (codeSigningInfo == null) {
-      codeSigningInfo = {cscName: this.options.sign || process.env.CSC_NAME}
-    }
+  private createHelper(platform: string, cleanupTasks: Array<() => Promise<any>>): PlatformPackager<any> {
+    switch (platform) {
+      case "darwin":
+      case "osx":
+      {
+        const helperClass: typeof MacPackager = require("./macPackager").default
+        return new helperClass(this, cleanupTasks)
+      }
 
-    if (codeSigningInfo.cscName == null) {
-      log("App is not signed: CSC_LINK or CSC_NAME are not specified")
-      return Promise.resolve()
-    }
-    else {
-      log("Signing app")
-      return sign(distPath, codeSigningInfo)
+      case "win32":
+      case "win":
+      case "windows":
+      {
+        const helperClass: typeof WinPackager = require("./winPackager").default
+        return new helperClass(this, cleanupTasks)
+      }
+
+      case "linux":
+      {
+        const helperClass: typeof LinuxPackager = require("./linuxPackager").default
+        return new helperClass(this)
+      }
+
+      default:
+        throw new Error("Unsupported platform: " + platform)
     }
   }
 
@@ -214,43 +169,6 @@ export class Packager implements MetadataProvider {
     }
   }
 
-  private pack(platform: string, arch: string) {
-    return new BluebirdPromise((resolve, reject) => {
-      const version = this.metadata.version
-      let buildVersion = version
-      const buildNumber = process.env.TRAVIS_BUILD_NUMBER || process.env.APPVEYOR_BUILD_NUMBER || process.env.CIRCLE_BUILD_NUM
-      if (buildNumber != null) {
-        buildVersion += "." + buildNumber
-      }
-
-      const options = Object.assign({
-        dir: this.appDir,
-        out: path.dirname(this.outDir),
-        name: this.metadata.name,
-        platform: platform,
-        arch: arch,
-        version: this.electronVersion,
-        icon: path.join(this.projectDir, "build", "icon"),
-        asar: true,
-        overwrite: true,
-        "app-version": version,
-        "build-version": buildVersion,
-        "version-string": {
-          CompanyName: this.metadata.author,
-          FileDescription: this.metadata.description,
-          ProductVersion: version,
-          FileVersion: buildVersion,
-          ProductName: this.metadata.name,
-          InternalName: this.metadata.name,
-        }
-      }, this.metadata.build, {"tmpdir": false})
-
-      // this option only for windows-installer
-      delete options.iconUrl
-      packager(options, error => error == null ? resolve(null) : reject(error))
-    })
-  }
-
   private installAppDependencies(arch: string): Promise<any> {
     if (this.isTwoPackageJsonProjectLayoutUsed) {
       return installDependencies(this.appDir, arch, this.electronVersion)
@@ -259,164 +177,6 @@ export class Packager implements MetadataProvider {
       log("Skipping app dependencies installation because dev and app dependencies are not separated")
       return Promise.resolve(null)
     }
-  }
-
-  private zipMacApp(): Promise<string> {
-    log("Creating ZIP for Squirrel.Mac")
-    const appName = this.metadata.name
-    // -y param is important - "store symbolic links as the link instead of the referenced file"
-    const resultPath = `${appName}-${this.metadata.version}-mac.zip`
-    return spawn("zip", ["-ryXq", resultPath, appName + ".app"], {
-      cwd: this.outDir,
-      stdio: "inherit",
-    })
-      .thenReturn(this.outDir + "/" + resultPath)
-  }
-
-  private packageInDistributableFormat(platform: string, arch: string, certFilePromise: Promise<string>): Promise<any> {
-    const buildMetadata = this.devMetadata.build
-    if (platform === "win32") {
-      return this.packageWinInDistributableFormat(buildMetadata, arch, certFilePromise || BluebirdPromise.resolve(null))
-    }
-    else if (platform === "linux") {
-      return this.packageLinuxInDistributableFormat(buildMetadata, arch)
-    }
-    else {
-      return this.packageMacInDistributableFormat(buildMetadata)
-    }
-  }
-
-  private async packageWinInDistributableFormat(buildMetadata: DevBuildMetadata, arch: string, certFilePromise: Promise<string>): Promise<any> {
-    const customOptions = buildMetadata == null ? null : buildMetadata.win
-    let iconUrl = this.metadata.build.iconUrl
-    if (!iconUrl) {
-      if (customOptions != null) {
-        iconUrl = customOptions.iconUrl
-      }
-      if (!iconUrl) {
-        if (this.repositoryInfo != null) {
-          const info = await this.repositoryInfo.getInfo(this)
-          if (info != null) {
-            iconUrl = `https://raw.githubusercontent.com/${info.user}/${info.project}/master/build/icon.ico`
-          }
-        }
-
-        if (!iconUrl) {
-          throw new Error("iconUrl is not specified, please see https://github.com/develar/electron-complete-builder#in-short")
-        }
-      }
-    }
-
-    const certificateFile = await certFilePromise
-
-    const version = this.metadata.version
-    const outputDirectory = this.outDir + "-installer"
-    const options = Object.assign({
-      name: this.metadata.name,
-      appDirectory: this.outDir,
-      outputDirectory: outputDirectory,
-      productName: this.metadata.name,
-      version: version,
-      description: this.metadata.description,
-      authors: this.metadata.author,
-      iconUrl: iconUrl,
-      setupIcon: path.join(this.projectDir, "build", "icon.ico"),
-      certificateFile: certificateFile,
-      certificatePassword: this.options.cscKeyPassword,
-    }, customOptions)
-
-    try {
-      await new BluebirdPromise<any>((resolve, reject) => {
-        require("electron-winstaller-temp-fork").build(options, (error: Error) => error == null ? resolve(null) : reject(error))
-      })
-    }
-    catch (e) {
-      if (e.message.indexOf("Unable to set icon") < 0) {
-        throw e
-      }
-      else {
-        let fileInfo: fs.Stats
-        try {
-          fileInfo = await stat(options.setupIcon)
-        }
-        catch (e) {
-          throw new Error("Please specify correct setupIcon, file " + options.setupIcon + " not found")
-        }
-
-        if (fileInfo.isDirectory()) {
-          throw new Error("Please specify correct setupIcon, " + options.setupIcon + " is a directory")
-        }
-      }
-    }
-
-    const appName = this.metadata.name
-    const archSuffix = (arch === "x64") ? "-x64" : ""
-    return await Promise.all([
-      renameFile(path.join(outputDirectory, appName + "Setup.exe"), path.join(outputDirectory, appName + "Setup-" + version + archSuffix + ".exe"))
-        .then(it => this.dispatchArtifactCreated(it)),
-      renameFile(path.join(outputDirectory, appName + "-" + version + "-full.nupkg"), path.join(outputDirectory, appName + "-" + version + archSuffix + "-full.nupkg"))
-        .then(it => this.dispatchArtifactCreated(it))
-    ])
-  }
-
-  private packageMacInDistributableFormat(buildMetadata: DevBuildMetadata): Promise<any> {
-    const artifactPath = path.join(this.outDir, this.metadata.name + "-" + this.metadata.version + ".dmg")
-    return new BluebirdPromise<any>((resolve, reject) => {
-      log("Creating DMG")
-
-      const specification: appdmg.Specification = {
-        title: this.metadata.name,
-        icon: "build/icon.icns",
-        "icon-size": 80,
-        background: "build/background.png",
-        contents: [
-          {
-            "x": 410, "y": 220, "type": "link", "path": "/Applications"
-          },
-          {
-            "x": 130, "y": 220, "type": "file"
-          }
-        ]
-      }
-
-      if (buildMetadata != null && buildMetadata.osx != null) {
-        Object.assign(specification, buildMetadata.osx)
-      }
-
-      if (specification.title == null) {
-        specification.title = this.metadata.name
-      }
-
-      specification.contents[1].path = path.join(this.outDir, this.metadata.name + ".app")
-
-      const appDmg = require("appdmg")
-      const emitter = appDmg({
-        target: artifactPath,
-        basepath: this.projectDir,
-        specification: specification
-      })
-      emitter.on("error", reject)
-      emitter.on("finish", () => resolve())
-    })
-      .then(() => this.dispatchArtifactCreated(artifactPath))
-  }
-
-  private packageLinuxInDistributableFormat(buildMetadata: DevBuildMetadata, arch: string): Promise<any> {
-    const specification: DebOptions = {
-      version: this.metadata.version,
-      title: this.metadata.name,
-      comment: this.metadata.description,
-      maintainer: this.metadata.author,
-      arch: arch === "ia32" ? 32 : 64,
-      target: "deb",
-      executable: this.metadata.name,
-    }
-
-    if (buildMetadata != null && buildMetadata.linux != null) {
-      Object.assign(specification, buildMetadata.linux)
-    }
-    return makeDeb(specification, this.outDir)
-      .then(it => this.dispatchArtifactCreated(it))
   }
 }
 

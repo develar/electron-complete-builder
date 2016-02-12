@@ -1,4 +1,5 @@
-import { PackagerOptions, Packager } from "./packager"
+import { Packager } from "./packager"
+import { PackagerOptions } from "./platformPackager"
 import { PublishOptions, Publisher, GitHubPublisher } from "./gitHubPublisher"
 import { executeFinally } from "./promise"
 import { Promise as BluebirdPromise } from "bluebird"

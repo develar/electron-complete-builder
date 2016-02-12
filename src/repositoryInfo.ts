@@ -14,16 +14,6 @@ export interface Metadata {
   repository: string | RepositoryInfo
 }
 
-export interface DevMetadata extends Metadata {
-  build: DevBuildMetadata
-}
-
-export interface DevBuildMetadata {
-  osx: appdmg.Specification
-  win: any,
-  linux: any
-}
-
 export interface AppMetadata extends Metadata {
   version: string
   name: string
@@ -39,9 +29,9 @@ export interface BuildMetadata {
   iconUrl: string
 }
 
-export interface MetadataProvider {
+export interface ProjectMetadataProvider {
   metadata: AppMetadata
-  devMetadata: DevMetadata
+  devMetadata: Metadata
 }
 
 export interface RepositorySlug {
@@ -52,7 +42,7 @@ export interface RepositorySlug {
 export class InfoRetriever {
   _info: Promise<Info>
 
-  getInfo(provider: MetadataProvider): Promise<Info> {
+  getInfo(provider: ProjectMetadataProvider): Promise<Info> {
     if (this._info == null) {
       this._info = getInfo(provider)
     }
@@ -88,7 +78,7 @@ async function getGitUrlFromGitConfig(): Promise<string> {
   return null
 }
 
-async function getInfo(provider: MetadataProvider): Promise<RepositorySlug> {
+async function getInfo(provider: ProjectMetadataProvider): Promise<RepositorySlug> {
   const repo = provider.devMetadata.repository || provider.metadata.repository
   if (repo == null) {
     let url = process.env.TRAVIS_REPO_SLUG
