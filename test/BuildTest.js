@@ -40,11 +40,6 @@ async function assertPack(projectDir, platform) {
     platform: platform,
   })
 
-  // for non-osx we always use temp dir, so, don't need to clean
-  if (isDoNotUseTempDir) {
-    await deleteDirectory(path.join(projectDir, "dist"))
-  }
-
   await packager.build()
   if (platform === "darwin") {
     const packedAppDir = projectDir + "/dist/TestApp-darwin-x64/TestApp.app"
@@ -61,27 +56,29 @@ async function assertPack(projectDir, platform) {
   }
 }
 
-if (!process.env.APPVEYOR) {
-  if (process.env.TRAVIS !== "true") {
-    // we don't use CircleCI, so, we can safely set this env
-    process.env.CIRCLE_BUILD_NUM = 42
-  }
+if (process.env.TRAVIS !== "true") {
+  // we don't use CircleCI, so, we can safely set this env
+  process.env.CIRCLE_BUILD_NUM = 42
+}
 
-  test("mac: two-package.json", async t => {
+if (process.platform === "darwin") {
+  test("mac: two-package.json", async function () {
     await assertPack("test-app", "darwin")
   })
 
-  test("mac: one-package.json", async t => {
+  test("mac: one-package.json", async function () {
     await assertPack("test-app-one", "darwin")
   })
+}
 
-  test("linux", async t => {
+if (process.platform !== "win32") {
+  test("linux", async function () {
     await assertPack("test-app-one", "linux")
   })
 }
 
 if (!process.env.TRAVIS) {
-  test("win", async t => {
+  test("win", async function () {
     await assertPack("test-app-one", "win32")
   })
 }

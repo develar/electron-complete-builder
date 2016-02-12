@@ -92,24 +92,23 @@ You need to deploy somewhere [releases/downloads server](https://github.com/Gitb
 In general, there is a possibility to setup it as a service for all (it is boring and stupid to setup own if cloud service is possible). May be I will setup it soon (feel free to file an issue to track progress). It is safe since you should sign your app in any case (so, even if server will be compromised, users will not be affected because OS X will just block unsigned/unidentified app).
 
 # Code signing
+OS X and Windows code siging is supported.
 On a development machine set environment variable `CSC_NAME` to your identity (recommended). Or pass `--sign` parameter.
 ```
 export CSC_NAME="Developer ID Application: Your Name (code)"
 ```
 
-## Travis
-To sign app on Travis server:
+## Travis, AppVeyor and other CI servers
+To sign app on build server:
 
-1. [Export](https://developer.apple.com/library/ios/documentation/IDEs/Conceptual/AppDistributionGuide/MaintainingCertificates/MaintainingCertificates.html#//apple_ref/doc/uid/TP40012582-CH31-SW7) certificate. [Strong password](http://security.stackexchange.com/a/54773) must be used. Consider to not use special characters (for bash) because “*values are not escaped when your builds are executed*”.
+1. [Export](https://developer.apple.com/library/ios/documentation/IDEs/Conceptual/AppDistributionGuide/MaintainingCertificates/MaintainingCertificates.html#//apple_ref/doc/uid/TP40012582-CH31-SW7) certificate.
+ [Strong password](http://security.stackexchange.com/a/54773) must be used. Consider to not use special characters (for bash) because “*values are not escaped when your builds are executed*”.
 2. Upload `*.p12` file (e.g. on [Google Drive](http://www.syncwithtech.org/p/direct-download-link-generator.html)).
-3. [Set](https://docs.travis-ci.com/user/environment-variables/#Encrypted-Variables) `CSC_LINK` and `CSC_KEY_PASSWORD` environment variables:
+3. Set ([Travis](https://docs.travis-ci.com/user/environment-variables/#Encrypted-Variables) or [AppVeyor](https://ci.appveyor.com/tools/encrypt)) `CSC_LINK` and `CSC_KEY_PASSWORD` environment variables:
 ```
 travis encrypt "CSC_LINK='https://drive.google.com/uc?export=download&id=***'" --add
 travis encrypt 'CSC_KEY_PASSWORD=beAwareAboutBashEscaping!!!' --add
 ```
-
-## AppVeyor
-Windows code signing is not yet supported in a smart way, you need to pass corresponding [windows-installer](https://github.com/electronjs/windows-installer#configuring) options directly.
 
 # Windows
 Hint: You don't need a windows machine to build windows artifacts — use [AppVeyor](http://www.appveyor.com/). See  [sample appveyor.yml to build Electron app on windows](https://github.com/develar/onshape-desktop-shell/blob/master/appveyor.yml).

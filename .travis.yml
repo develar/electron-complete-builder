@@ -2,7 +2,10 @@ os:
   - osx
   - linux
 
-language: cpp
+language: ruby
+
+rvm:
+  - 2.2.0
 
 cache:
   directories:
@@ -10,13 +13,11 @@ cache:
     - test/testApp/node_modules
     - $HOME/.electron
     - $HOME/.npm
-    - /usr/local/Cellar
-    - /Library/Caches/Homebrew
-    - /usr/local/Library
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install fpm; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install gnu-tar ; fi
+  - gem install fpm
 
 install:
 - rm -rf ~/.nvm
@@ -26,8 +27,7 @@ install:
 - npm install npm -g
 - npm -v
 - npm prune
-- npm update
+- npm install
 
 script:
-- npm run compile
 - npm run test

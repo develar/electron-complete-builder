@@ -2,7 +2,7 @@ import * as fs from "fs"
 import * as path from "path"
 import { DEFAULT_APP_DIR_NAME, installDependencies, log, getElectronVersion, spawn } from "./util"
 import { renameFile, parseJsonFile, deleteDirectory, stat } from "./promisifed-fs"
-import { createKeychain, deleteKeychain, CodeSigningInfo, generateKeychainName, sign } from "./codeSign"
+import { createKeychain, deleteKeychain, CodeSigningInfo, generateKeychainName, sign, downloadCertificate } from "./codeSign"
 import { all, executeFinally } from "./promise"
 import { EventEmitter } from "events"
 import { Promise as BluebirdPromise } from "bluebird"
@@ -89,6 +89,7 @@ export class Packager implements MetadataProvider {
     let macCodeSigningInfo: CodeSigningInfo = null
     let keychainName: string = null
     const distTasks: Array<Promise<any>> = []
+    let certFilePromise: Promise<string> = null
     for (let platform of platforms) {
       const isMac = platform === "darwin"
       const archs = isMac ? ["x64"] : (this.options.arch == null || this.options.arch === "all" ? ["ia32", "x64"] : [this.options.arch])
@@ -114,14 +115,24 @@ export class Packager implements MetadataProvider {
         else if (this.options.dist && platform === "win32") {
           const installerOut = this.outDir + "-installer"
           log("Removing %s", installerOut)
-          await BluebirdPromise.all([this.pack(platform, arch), deleteDirectory(installerOut)])
+          const tasks: Array<Promise<any>> = [
+            this.pack(platform, arch),
+            deleteDirectory(installerOut)
+          ]
+          // https://developer.mozilla.org/en-US/docs/Signing_an_executable_with_Authenticode
+          // https://github.com/Squirrel/Squirrel.Windows/pull/505
+          if (certFilePromise === null && this.options.cscLink != null && this.options.cscKeyPassword != null && process.platform !== "darwin") {
+            certFilePromise = downloadCertificate(this.options.cscLink)
+            tasks.push(certFilePromise)
+          }
+          await BluebirdPromise.all(tasks)
         }
         else {
           await this.pack(platform, arch)
         }
 
         if (this.options.dist) {
-          distTasks.push(this.packageInDistributableFormat(platform, arch))
+          distTasks.push(this.packageInDistributableFormat(platform, arch, certFilePromise))
           if (isMac) {
             distTasks.push(this.zipMacApp()
               .then(it => this.dispatchArtifactCreated(it)))
@@ -262,10 +273,10 @@ export class Packager implements MetadataProvider {
       .thenReturn(this.outDir + "/" + resultPath)
   }
 
-  private packageInDistributableFormat(platform: string, arch: string): Promise<any> {
+  private packageInDistributableFormat(platform: string, arch: string, certFilePromise: Promise<string>): Promise<any> {
     const buildMetadata = this.devMetadata.build
     if (platform === "win32") {
-      return this.packageWinInDistributableFormat(buildMetadata, arch)
+      return this.packageWinInDistributableFormat(buildMetadata, arch, certFilePromise || BluebirdPromise.resolve(null))
     }
     else if (platform === "linux") {
       return this.packageLinuxInDistributableFormat(buildMetadata, arch)
@@ -275,7 +286,7 @@ export class Packager implements MetadataProvider {
     }
   }
 
-  private async packageWinInDistributableFormat(buildMetadata: DevBuildMetadata, arch: string): Promise<any> {
+  private async packageWinInDistributableFormat(buildMetadata: DevBuildMetadata, arch: string, certFilePromise: Promise<string>): Promise<any> {
     const customOptions = buildMetadata == null ? null : buildMetadata.win
     let iconUrl = this.metadata.build.iconUrl
     if (!iconUrl) {
@@ -296,6 +307,8 @@ export class Packager implements MetadataProvider {
       }
     }
 
+    const certificateFile = await certFilePromise
+
     const version = this.metadata.version
     const outputDirectory = this.outDir + "-installer"
     const options = Object.assign({
@@ -308,6 +321,8 @@ export class Packager implements MetadataProvider {
       authors: this.metadata.author,
       iconUrl: iconUrl,
       setupIcon: path.join(this.projectDir, "build", "icon.ico"),
+      certificateFile: certificateFile,
+      certificatePassword: this.options.cscKeyPassword,
     }, customOptions)
 
     try {

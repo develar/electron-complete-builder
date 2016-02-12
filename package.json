@@ -10,15 +10,15 @@
   "scripts": {
     "compile": "tsconfig -i 2 && ts-babel",
     "lint": "tslint src/*",
-    "pretest": "npm run lint",
+    "pretest": "npm run compile && npm run lint",
     "test": "ava",
-    "release": "npm prune && npm run compile && npm run test && npm publish",
-    "preversion": "npm prune && npm run compile && npm run test"
+    "release": "npm prune && npm test && npm publish",
+    "preversion": "npm prune && npm test"
   },
   "dependencies": {
-    "bluebird": "^3.2.2",
+    "bluebird": "^3.3.0",
     "command-line-args": "^2.1.4",
-    "electron-builder-tf": "^2.7.3-beta.0",
+    "electron-builder-tf": "^2.7.3-beta.4",
     "electron-packager-tf": "^5.2.1-beta.2",
     "electron-winstaller-temp-fork": "^0.1.0",
     "hosted-git-info": "^2.1.4",

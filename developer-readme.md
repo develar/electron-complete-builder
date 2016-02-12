@@ -11,5 +11,6 @@ Do not use OS X bundled Ruby. Install using brew.
 
 ```
 brew install ruby
+brew install gnu-tar
 gem install fpm
 ```

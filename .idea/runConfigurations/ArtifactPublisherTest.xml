@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="ArtifactPublisherTest" type="NodeJSConfigurationType" factoryName="Node.js" singleton="true" path-to-node="$PROJECT_DIR$/../node/out/Release/node" path-to-js-file="node_modules/.bin/ava" application-parameters="--serial test/ArtifactPublisherTest.js" node-parameters="--harmony_rest_parameters --harmony_default_parameters" working-dir="$PROJECT_DIR$">
+  <configuration default="false" name="ArtifactPublisherTest" type="NodeJSConfigurationType" factoryName="Node.js" singleton="true" path-to-node="/usr/local/Cellar/node/5.6.0/bin/node" path-to-js-file="node_modules/.bin/ava" application-parameters="--serial test/ArtifactPublisherTest.js" node-parameters="--harmony_rest_parameters --harmony_default_parameters" working-dir="$PROJECT_DIR$">
     <method />
   </configuration>
 </component>

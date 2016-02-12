@@ -17,8 +17,7 @@ install:
   - npm prune
   - npm install
 
-build_script:
-  - npm run compile
+build: off
 
 test_script:
   - npm run test

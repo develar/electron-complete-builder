@@ -92,3 +92,9 @@ export function deleteKeychain(keychainName: string, ignoreNotFound: boolean = t
     return result
   }
 }
+
+export function downloadCertificate(cscLink: string): Promise<string> {
+  const certPath = path.join(tmpdir(), randomString() + ".p12")
+  return download(cscLink, certPath)
+    .thenReturn(certPath)
+}

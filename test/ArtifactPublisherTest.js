@@ -1,4 +1,3 @@
-import assertThat from "should/as-function"
 import test from "ava-tf"
 import { GitHubPublisher } from "../out/gitHubPublisher"
 import { join } from "path"
@@ -19,7 +18,27 @@ const iconPath = join(__dirname, "fixtures", "test-app", "build", "icon.icns")
 //    .releasePromise, /(Bad credentials|Unauthorized|API rate limit exceeded)/)
 //})
 
-test("GitHub upload", async function () {
+function isApiRateError(e) {
+  return e.description != null && e.description.message != null && e.description.message.includes("API rate limit exceeded")
+}
+
+function testAndIgnoreApiRate(name, testFunction) {
+  test(name, async () => {
+    try {
+      await testFunction()
+    }
+    catch (e) {
+      if (isApiRateError(e)) {
+        console.warn(e.description.message)
+      }
+      else {
+        throw e
+      }
+    }
+  })
+}
+
+testAndIgnoreApiRate("GitHub upload", async () => {
   const publisher = new GitHubPublisher("actperepo", "ecb2", versionNumber(), token)
   try {
     await publisher.upload(iconPath)
@@ -29,7 +48,7 @@ test("GitHub upload", async function () {
   }
 })
 
-test("GitHub overwrite on upload", async() => {
+testAndIgnoreApiRate("GitHub overwrite on upload", async () => {
   const publisher = new GitHubPublisher("actperepo", "ecb2", versionNumber(), token)
   try {
     await publisher.upload(iconPath)
