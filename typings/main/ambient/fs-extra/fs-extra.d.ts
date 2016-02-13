@@ -1,3 +1,5 @@
+// Compiled using typings@0.6.8
+// Source: https://raw.githubusercontent.com/DefinitelyTyped/DefinitelyTyped/72d95b38f008fed506c6cbf3af8a693bd7c3363a/fs-extra/fs-extra.d.ts
 // Type definitions for fs-extra
 // Project: https://github.com/jprichardson/node-fs-extra
 // Definitions by: midknight41 <https://github.com/midknight41>
@@ -5,7 +7,6 @@
 
 // Imported from: https://github.com/soywiz/typescript-node-definitions/fs-extra.d.ts
 
-///<reference path="../node/node.d.ts"/>
 
 declare module "fs-extra" {
 	import stream = require("stream");
@@ -57,7 +58,7 @@ declare module "fs-extra" {
 	export function mkdirsSync(dir: string, options?: MkdirOptions): void;
 	export function mkdirpSync(dir: string, options?: MkdirOptions): void;
 
-	function outputFile(file: string, data: any, callback: (err: Error) => void): void;
+	export function outputFile(file: string, data: any, callback?: (err: Error) => void): void;
 	export function outputFileSync(file: string, data: any): void;
 
 	export function outputJson(file: string, data: any, callback?: (err: Error) => void): void;
@@ -65,10 +66,10 @@ declare module "fs-extra" {
 	export function outputJsonSync(file: string, data: any): void;
 	export function outputJSONSync(file: string, data: any): void;
 
-	export function readJson(file: string, callback?: (err: Error) => void): void;
-	export function readJson(file: string, options?: OpenOptions, callback?: (err: Error) => void): void;
-	export function readJSON(file: string, callback?: (err: Error) => void): void;
-	export function readJSON(file: string, options?: OpenOptions, callback?: (err: Error) => void): void;
+	export function readJson(file: string, callback: (err: Error, jsonObject: any) => void): void;
+	export function readJson(file: string, options: OpenOptions, callback: (err: Error, jsonObject: any) => void): void;
+	export function readJSON(file: string, callback: (err: Error, jsonObject: any) => void): void;
+	export function readJSON(file: string, options: OpenOptions, callback: (err: Error, jsonObject: any) => void): void;
 
 	export function readJsonSync(file: string, options?: OpenOptions): any;
 	export function readJSONSync(file: string, options?: OpenOptions): any;
@@ -202,11 +203,4 @@ declare module "fs-extra" {
 	export function createReadStream(path: string, options?: ReadStreamOptions): ReadStream;
 	export function createWriteStream(path: string, options?: WriteStreamOptions): WriteStream;
 	export function createOutputStream(path: string, options?: WriteStreamOptions): WriteStream;
-
-	interface MoveOptions {
-		// default: false
-		clobber?: boolean
-	}
-
-	function move(src: string, dest: string, options: MoveOptions, callback: (error: Error) => void): void
 }

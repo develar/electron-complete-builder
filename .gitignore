@@ -5,3 +5,6 @@ dist/
 .idea/compiler.xml
 .idea/encodings.xml
 .idea/copyright/profiles_settings.xml
+typings/browser
+typings/browser.d.ts
+typings/main.d.ts

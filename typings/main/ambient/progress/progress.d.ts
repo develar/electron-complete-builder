@@ -1,9 +1,10 @@
+// Compiled using typings@0.6.8
+// Source: https://raw.githubusercontent.com/DefinitelyTyped/DefinitelyTyped/d54b18e0ac3277376700b6026ef9e9e3f380df50/progress/progress.d.ts
 // Type definitions for node-progress v1.1.8
 // Project: https://github.com/tj/node-progress
 // Definitions by: Sebastian Lenz <https://github.com/sebastian-lenz>
 // Definitions: https://github.com/borisyankov/DefinitelyTyped
 
-/// <reference path="../node/node.d.ts"/>
 
 
 declare module "progress"

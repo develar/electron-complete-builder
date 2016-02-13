@@ -1,4 +1,6 @@
-﻿// Type definitions for tmp v0.0.28
+// Compiled using typings@0.6.8
+// Source: https://raw.githubusercontent.com/DefinitelyTyped/DefinitelyTyped/48f20e97bfaf70fc1a9537b38aed98e9749be0ae/tmp/tmp.d.ts
+// Type definitions for tmp v0.0.28
 // Project: https://www.npmjs.com/package/tmp
 // Definitions by: Jared Klopper <https://github.com/optical>
 // Definitions: https://github.com/borisyankov/DefinitelyTyped
