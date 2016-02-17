@@ -29,17 +29,28 @@ Real project example — [onshape-desktop-shell](https://github.com/develar/onsh
   This object will be used as source of [electron-packager](https://www.npmjs.com/package/electron-packager) options. You can specify any other options here.
 
 2. Create directory `build` in the root of the project and put your `background.png` (OS X DMG background), `icon.icns` (OS X app icon) and `icon.ico` (Windows app icon).
+  Linux icon set will be generated automatically on the fly from the OS X `icns` file.
 
 3. Add [scripts](https://docs.npmjs.com/cli/run-script) to the development `package.json`:
     ```json
-    "scripts" : {
+    "scripts": {
       "postinstall": "install-app-deps",
       "pack": "build",
-      "dist": "build --dist"
+      "dist": "build"
     }
     ```
 
     And then you can run `npm run pack` or `npm run dist` (to package in a distributable format (e.g. DMG, windows installer, NuGet package)).
+
+4. Install required system packages:
+
+  If you want to build app in distributable format for Linux or Windows on OS X (install [brew](http://brew.sh) if not yet installed):
+  ```
+  brew install Caskroom/cask/xquartz wine mono ruby gnu-tar libicns
+  gem install fpm
+  ```
+
+  Linux and Windows: not documented yet.
 
 ## iconUrl
 Please note — [local icon file url is not accepted](https://github.com/atom/grunt-electron-installer/issues/73), must be https/http.
