@@ -1,3 +1,11 @@
+**This project [merged](https://github.com/loopline-systems/electron-builder/issues/138) into [electron-builder](https://github.com/loopline-systems/electron-builder)**.
+
+**Do not fork, do not file issues here**.
+
+**You can still to use npm package `electron-complete-builder` because for now new versions is published often** (release cycle is shorter).
+
+Announce and docs on `electron-builder` page in work.
+
 Complete solution to build ready for distribution and "auto update" installers of your app for OS X, Windows and Linux.
 
 * [Native application dependencies](http://electron.atom.io/docs/latest/tutorial/using-native-node-modules/) compilation (only if two-package.json project layout used).
